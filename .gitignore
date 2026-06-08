@@ -1,0 +1,15 @@
+# Ignore frontend dependency folders
+node_modules/
+dist/
+
+# Ignore Python backend environments
+backend/venv/
+backend/__pycache__/
+
+# Ignore configurations & credentials
+.env
+.env.local
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
