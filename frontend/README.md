@@ -1,16 +1,37 @@
-# React + Vite
+# ONGC Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the React + Vite frontend for the ONGC project.
 
-Currently, two official plugins are available:
+## Local setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+1. Open a terminal in `frontend`
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+4. Open the URL shown in the terminal (usually `http://localhost:5173`)
 
-## React Compiler
+## Backend setup
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The backend server is in the `backend` folder. Install Python dependencies there:
 
-## Expanding the ESLint configuration
+```bash
+cd ../backend
+pip install -r requirements.txt
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Then run the FastAPI server:
+
+```bash
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+## Notes
+
+- The frontend uses CORS settings that currently allow all origins.
+- In production, change `allow_origins` in `backend/main.py` to your frontend URL.
+- Make sure the backend `.env` file includes `DATABASE_URL` for your database.
