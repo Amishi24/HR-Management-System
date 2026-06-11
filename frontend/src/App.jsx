@@ -13,7 +13,7 @@ function App() {
     async function fetchLocations() {
       try {
         const { data, error } = await supabase
-          .from('Location')
+          .from('location')
           .select('*')
 
         if (error) throw error
