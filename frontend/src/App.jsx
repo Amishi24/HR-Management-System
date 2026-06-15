@@ -1,76 +1,92 @@
-import { useState, useEffect } from 'react'
-import { supabase } from './utils/supabaseClient' // Ensure this path matches your folder structure
-import './App.css'
+// src/App.jsx
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { LayoutDashboard, Users, ArrowLeftRight, HeartPulse, GraduationCap } from 'lucide-react';
+import { mockEmployees, mockTransfers } from './data/mockDb';
 
-function App() {
-  // 1. State for our database data, loading status, and any potential errors
-  const [locations, setLocations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [errorMsg, setErrorMsg] = useState(null)
+// --- SIDEBAR COMPONENT ---
+function Sidebar() {
+  const location = useLocation();
+  
+  const navItems = [
+    { name: 'Dashboard', path: '/', icon: <LayoutDashboard size={20} /> },
+    { name: 'Directory', path: '/employees', icon: <Users size={20} /> },
+    { name: 'Transfer Board', path: '/transfers', icon: <ArrowLeftRight size={20} /> },
+    { name: 'Medical Approvals', path: '/medical', icon: <HeartPulse size={20} /> },
+  ];
 
-  // 2. Fetch data from Supabase when the app loads
-  useEffect(() => {
-    async function fetchLocations() {
-      try {
-        const { data, error } = await supabase
-          .from('location')
-          .select('*')
-
-        if (error) throw error
-
-        console.log("Success! Data received:", data)
-        setLocations(data || [])
-      } catch (error) {
-        console.error("Error fetching data:", error.message)
-        setErrorMsg(error.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLocations()
-  }, [])
-
-  // 3. Render the Dashboard UI
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
-      <h1>HR Manpower Dashboard</h1>
-      <p style={{ color: '#888' }}>Live Database Connection Test</p>
-
-      {/* Show Loading State */}
-      {loading && <p>Connecting to Supabase cloud...</p>}
-
-      {/* Show Error State if the .env.local fails again */}
-      {errorMsg && (
-        <div style={{ color: '#ff4a4a', padding: '1rem', border: '1px solid #ff4a4a', borderRadius: '8px', marginTop: '1rem' }}>
-          <p><strong>Connection Error:</strong> {errorMsg}</p>
-          <p>Please double-check your .env.local file and restart the Vite server.</p>
-        </div>
-      )}
-
-      {/* Show the Data if successful */}
-      {!loading && !errorMsg && (
-        <div style={{ background: '#242424', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
-          <h3 style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginTop: 0 }}>
-            Active Locations
-          </h3>
-          
-          {locations.length === 0 ? (
-            <p style={{ color: '#aaa' }}>Database connected, but no locations found. Tell Developer A to insert "Delhi HQ"!</p>
-          ) : (
-            <ul style={{ listStyleType: 'none', padding: 0 }}>
-              {locations.map((loc) => (
-                <li key={loc.id} style={{ margin: '10px 0', padding: '15px', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #333' }}>
-                  <strong style={{ fontSize: '1.2rem', color: '#fff' }}>{loc.name}</strong> <br />
-                  <small style={{ color: '#666', fontFamily: 'monospace' }}>UUID: {loc.id}</small>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+    <div className="w-64 bg-slate-900 text-white min-h-screen p-4 flex flex-col">
+      <div className="mb-8 px-2">
+        <h1 className="text-xl font-bold tracking-wider text-blue-400">HR ADMIN</h1>
+        <p className="text-xs text-slate-400">Manpower Rotation Engine</p>
+      </div>
+      
+      <nav className="flex flex-col gap-2">
+        {navItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Link 
+              key={item.name} 
+              to={item.path}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-800'
+              }`}
+            >
+              {item.icon}
+              <span className="font-medium">{item.name}</span>
+            </Link>
+          );
+        })}
+      </nav>
     </div>
-  )
+  );
 }
 
-export default App
+// --- DUMMY VIEWS (To be expanded later) ---
+function Dashboard() {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">System Overview</h2>
+      <div className="grid grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500 font-medium">Active Employees</p>
+          <p className="text-3xl font-bold text-slate-800">{mockEmployees.length}</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500 font-medium">Pending Transfers</p>
+          <p className="text-3xl font-bold text-blue-600">{mockTransfers.length}</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+          <p className="text-slate-500 font-medium">Medical Requests</p>
+          <p className="text-3xl font-bold text-red-500">1</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Placeholder({ title }) {
+  return <div className="p-8 text-center text-slate-500 mt-20 border-2 border-dashed border-slate-300 rounded-xl">
+    <h2 className="text-xl font-bold mb-2">{title} Page</h2>
+    <p>We will build this component next.</p>
+  </div>;
+}
+
+// --- MAIN APP ROUTER ---
+export default function App() {
+  return (
+    <Router>
+      <div className="flex min-h-screen bg-slate-50">
+        <Sidebar />
+        <main className="flex-1 p-8">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/employees" element={<Placeholder title="Employee Directory" />} />
+            <Route path="/transfers" element={<Placeholder title="Transfer Board" />} />
+            <Route path="/medical" element={<Placeholder title="Medical Approvals" />} />
+          </Routes>
+        </main>
+      </div>
+    </Router>
+  );
+}
