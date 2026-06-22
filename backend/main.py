@@ -1,37 +1,31 @@
-from fastapi import FastAPI, HTTPException, Depends, status
-from fastapi.responses import HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database import get_db
 
-app = FastAPI(title="ONGC API Server")
+# Import our setup from the files we just created
+from database import get_session
+from models import Location, Employee
+from schemas import LocationResponse, EmployeeResponse
 
-# Allow your React frontend laptop to communicate with FastAPI
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # Change to your frontend URL in production
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Initialize the FastAPI application
+app = FastAPI(title="ONGC HR Management System")
 
-@app.get("/", response_class=HTMLResponse)
-@app.get("/home", response_class=HTMLResponse)
-def read_root():
-    return f"<h1>Welcome to the ONGC API Server</h1><p>Use the /test-db endpoint to check database connectivity.</p>"
-
-@app.get("/test-db")
-def test_db(db: Session = Depends(get_db)):
-    try:
-        result = db.execute(text("SELECT NOW()")).fetchone()
-
-        return {
-            "message": "Database connection successful!",
-            "current_time": str(result[0])
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+@app.get("/locations", response_model=list[LocationResponse])
+def read_locations(session: Session = Depends(get_session)):
+    # 1. Build the query: "SELECT * FROM location"
+    query = select(Location)
     
+    # 2. Execute the query and fetch all the results
+    # .scalars() pulls the actual Location objects out of the database rows
+    locations = session.scalars(query).all()
     
+    # 3. Return the list. FastAPI automatically converts these Python objects into JSON!
+    return locations
+
+@app.get("/employees/{employee_id}", response_model=EmployeeResponse)
+def get_employee(employee_id: int, session: Session = Depends(get_session)):
+    query = select(Employee).where(Employee.id == employee_id)
+    employee = session.scalars(query).first()
+    if not employee:
+        raise HTTPException(status_code=404, detail=f"Employee with id {employee_id} not found")
+    return employee
