@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -15,9 +16,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
+@app.get("/home", response_class=HTMLResponse)
 def read_root():
-    return {"message": "ONGC FastAPI Backend Server is Running!"}
+    return f"<h1>Welcome to the ONGC API Server</h1><p>Use the /test-db endpoint to check database connectivity.</p>"
 
 @app.get("/test-db")
 def test_db(db: Session = Depends(get_db)):
@@ -25,14 +27,11 @@ def test_db(db: Session = Depends(get_db)):
         result = db.execute(text("SELECT NOW()")).fetchone()
 
         return {
-            "message": "Database connected successfully!",
-            "time": str(result[0])
+            "message": "Database connection successful!",
+            "current_time": str(result[0])
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database connection failed: {str(e)}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
     
     
