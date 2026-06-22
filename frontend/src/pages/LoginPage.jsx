@@ -5,11 +5,11 @@ export default function LoginPage({ onLogin }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-banner">
+          <div className="login-banner">
           <div className="brand-mark">O</div>
           <div>
             <h1>ONGC Login</h1>
-            <p>Light, clean access for the HR management portal.</p>
+            <p>Light, clean access for the workforce portal.</p>
           </div>
         </div>
 

@@ -9,6 +9,9 @@ import MedicalPage from './pages/MedicalPage'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import SuperAdminEmployeesPage from './pages/SuperAdminEmployeesPage'
 import SuperAdminRulesPage from './pages/SuperAdminRulesPage'
+import EmployeeDashboardPage from './pages/EmployeeDashboardPage'
+import EmployeeProfilePage from './pages/EmployeeProfilePage'
+import EmployeeCareNotesPage from './pages/EmployeeCareNotesPage'
 
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(false)
@@ -29,13 +32,21 @@ export default function App() {
   if (!loggedIn) return <LoginPage onLogin={handleLogin} />
 
   const isSuperAdmin = role === 'super-admin'
+  const isEmployee = role === 'employee'
 
   return (
     <Router>
       <div className="app-shell">
         <Sidebar role={role} onLogout={handleLogout} />
         <main className="app-main">
-          {isSuperAdmin ? (
+          {isEmployee ? (
+            <Routes>
+              <Route path="/" element={<EmployeeDashboardPage />} />
+              <Route path="/profile" element={<EmployeeProfilePage />} />
+              <Route path="/care-notes" element={<EmployeeCareNotesPage />} />
+              <Route path="*" element={<EmployeeDashboardPage />} />
+            </Routes>
+          ) : isSuperAdmin ? (
             <Routes>
               <Route path="/" element={<SuperAdminDashboard />} />
               <Route path="/super/employees" element={<SuperAdminEmployeesPage />} />

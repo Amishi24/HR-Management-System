@@ -2,7 +2,8 @@
 
 export const mockRoles = [
   { id: "hr-admin", label: "HR admin" },
-  { id: "super-admin", label: "Super admin" }
+  { id: "super-admin", label: "Super admin" },
+  { id: "employee", label: "Employee" },
 ];
 
 export const mockEmployees = [
@@ -114,3 +115,59 @@ export const mockTransferRules = {
     canBeReplacedBy: [level]
   }))
 };
+
+export const mockEmployeeProfile = {
+  employeeId: 'ONGC-1027',
+  name: 'Aarav Sharma',
+  dob: '1985-06-15',
+  doRetirement: '2045-06-15',
+  joiningDate: '2012-04-01',
+  discipline: 'Software Development',
+  level: 'E4',
+  domicileState: 'Karnataka',
+  currentPosition: {
+    location: 'Bengaluru Tech Park',
+    department: 'Engineering',
+    section: 'Platform',
+  },
+  dependents: [
+    {
+      id: 1,
+      name: 'Ananya Sharma',
+      relationship: 'Spouse',
+      occupation: 'Homemaker',
+    },
+  ],
+  childrenEducation: [
+    {
+      id: 1,
+      childName: 'Riya Sharma',
+      schoolName: 'Delhi Public School',
+      currentClass: '10th Grade',
+    },
+  ],
+  assignments: [
+    {
+      id: 1,
+      title: 'Platform Reliability',
+      detail: 'Core system stability and release checks',
+      status: 'Active',
+    },
+    {
+      id: 2,
+      title: 'Cloud Migration Support',
+      detail: 'Assist migration planning for shared services',
+      status: 'Planned',
+    },
+  ],
+};
+
+export const mockEmployeeCareNotes = [
+  {
+    id: 1,
+    title: 'Ongoing cancer treatment at AIIMS Delhi',
+    details: 'Please consider this while planning relocation or travel-heavy assignments.',
+    status: 'Open',
+    updatedAt: '2026-06-21',
+  },
+];
