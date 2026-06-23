@@ -167,15 +167,6 @@ class Medical(Base):
     is_approve: Mapped[Optional[bool]] = mapped_column(Boolean, default=False)
     issue_year: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-class DependentDetailsView(Base):
-    __tablename__ = "vw_dependent_details"
-
-    dependent_id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    dependent_name: Mapped[str] = mapped_column(String)
-    relationship: Mapped[str] = mapped_column(String)
-    employee_id: Mapped[int] = mapped_column(Integer)
-    employee_name: Mapped[str] = mapped_column(String)
-
 class Employee(Base):
     __tablename__ = "employee"
 
@@ -188,3 +179,12 @@ class Employee(Base):
 
     discipline_id: Mapped[int] = mapped_column(Integer, ForeignKey("discipline.id"))
     current_position_id: Mapped[int] = mapped_column(Integer, ForeignKey("positions.id"))
+
+class DependentDetailsView(Base):
+    __tablename__ = "vw_dependent_details"
+
+    dependent_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dependent_name: Mapped[str] = mapped_column(String)
+    relationship: Mapped[str] = mapped_column(String)
+    employee_id: Mapped[int] = mapped_column(Integer)
+    employee_name: Mapped[str] = mapped_column(String)

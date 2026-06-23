@@ -12,14 +12,8 @@ app = FastAPI(title="ONGC HR Management System")
 
 @app.get("/locations", response_model=list[LocationResponse])
 def read_locations(session: Session = Depends(get_session)):
-    # 1. Build the query: "SELECT * FROM location"
     query = select(Location)
-    
-    # 2. Execute the query and fetch all the results
-    # .scalars() pulls the actual Location objects out of the database rows
     locations = session.scalars(query).all()
-    
-    # 3. Return the list. FastAPI automatically converts these Python objects into JSON!
     return locations
 
 @app.get("/employees/{employee_id}", response_model=EmployeeResponse)
