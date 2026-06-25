@@ -5,7 +5,8 @@ from datetime import date, datetime
 from sqlalchemy import CheckConstraint, String, Integer, SmallInteger, Boolean, Date, DateTime, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
-
+from datetime import date, datetime, timedelta  # <-- Added timedelta here
+from sqlalchemy import CheckConstraint, String, Integer, SmallInteger, Boolean, Date, DateTime, ForeignKey, Text, func, Interval # <-- Added Interval here
 class Base(DeclarativeBase):
     pass
 
@@ -21,7 +22,6 @@ class transfer_status(enum.Enum):
 class policy_scope(enum.Enum):
     GLOBAL = "Global"
     DEPARTMENT = "Department"
-    SECTION = "Section"
 
 class dependent_relation(enum.Enum):
     Spouse = "Spouse"
@@ -36,20 +36,25 @@ class Location(Base):
     state: Mapped[str] = mapped_column(String(100), nullable=False)
     region: Mapped[str] = mapped_column(String(100), nullable=False)
     is_difficult: Mapped[bool] = mapped_column(Boolean, default=False)
-    required_tenure_months: Mapped[int] = mapped_column(Integer, nullable=False, default=24)
+    required_tenure_years: Mapped[int] = mapped_column(Integer, nullable=False, default=2)
+    required_working_days_per_year: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
 
     positions: Mapped[List["Positions"]] = relationship(back_populates="location")
-    transfer_requests: Mapped[List["TransferRequest"]] = relationship(back_populates="location_preference")
 
 class Department(Base):
     __tablename__ = "department"
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    parent_id: Mapped[int | None] = mapped_column(SmallInteger, ForeignKey("department.id", ondelete="CASCADE"), nullable=True)
     goal_description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Relationships (Cascade deletes sections and capacities if department is deleted)
-    sections: Mapped[List["Section"]] = relationship(back_populates="department", cascade="all, delete-orphan")
+    # internal relationships(adjacency lists)
+    parent: Mapped[Optional["Department"]] = relationship("Department", remote_side=[id], back_populates="sub_departments")
+    sub_departments: Mapped[List["Department"]] = relationship(back_populates="parent", cascade="all, delete-orphan")
+
+    # external relationships
+    positions: Mapped[List["Positions"]] = relationship(back_populates="department", cascade="all, delete-orphan")
     capacities: Mapped[List["DepartmentDisciplineCapacity"]] = relationship(back_populates="department", cascade="all, delete-orphan")
 
 class Discipline(Base):
@@ -70,22 +75,13 @@ class RotationPolicy(Base):
     scope_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     rules_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=lambda: {})
 
-class Section(Base):
-    __tablename__ = "section"
-
-    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(100))
-    department_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("department.id", ondelete="CASCADE"))
-
-    department: Mapped["Department"] = relationship(back_populates="sections")
-    positions: Mapped[List["Positions"]] = relationship(back_populates="section", cascade="all, delete-orphan")
-
 class DepartmentDisciplineCapacity(Base):
     __tablename__ = "departmentdisciplinecapacity"
 
     discipline_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("discipline.id", ondelete="CASCADE"), primary_key=True)
     department_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("department.id", ondelete="CASCADE"), primary_key=True)
-    max_strength: Mapped[int] = mapped_column(Integer)
+    level: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    max_strength: Mapped[int] = mapped_column(Integer, nullable = False)
 
 
     discipline: Mapped["Discipline"] = relationship(back_populates="capacities")
@@ -97,13 +93,13 @@ class Positions(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     level: Mapped[int] = mapped_column(Integer, nullable=False)
-    section_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("section.id", ondelete="CASCADE"))
+    department_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("department.id", ondelete="CASCADE"), nullable = False)
     discipline_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("discipline.id"))
     location_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("location.id"))
     is_vacant: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
-    section: Mapped["Section"] = relationship(back_populates="positions")
+    department: Mapped["Department"] = relationship(back_populates="positions")
     discipline: Mapped["Discipline"] = relationship(back_populates="positions")
     location: Mapped["Location"] = relationship(back_populates="positions")
     
@@ -120,8 +116,9 @@ class Employee(Base):
     DoB: Mapped[date] = mapped_column(Date)
     domicile_state: Mapped[str] = mapped_column(String(100), nullable=True)
     DoRetirement: Mapped[date] = mapped_column(Date)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
 
-    discipline_id: Mapped[int] = mapped_column(Integer, ForeignKey("discipline.id"))
+    discipline_id: Mapped[int] = mapped_column(Integer, ForeignKey("discipline.id"), nullable=True)
     current_position_id: Mapped[int] = mapped_column(Integer, ForeignKey("positions.id", ondelete="SET NULL"), nullable=True)
 
 
@@ -170,12 +167,11 @@ class TransferRequest(Base):
     audit_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now())    
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now(), onupdate=func.now())
-    location_preference_id: Mapped[Optional[int]] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="SET NULL"), nullable=True)
-    to_position_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("positions.id", ondelete="SET NULL"), nullable=True)
+    location_preference: Mapped[Optional[int]] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="SET NULL"), nullable=True)
+    to_position_id: Mapped[List[int]] = mapped_column(ARRAY(SmallInteger), nullable=False, default = list, server_default="'{}'::smallint[]")
 
     employee: Mapped["Employee"] = relationship(foreign_keys=[employee_id], back_populates="transfer_requests")
     approver: Mapped[Optional["Employee"]] = relationship(foreign_keys=[approved_by], back_populates="approved_transfers")
-    location_preference: Mapped[Optional["Location"]] = relationship(back_populates="transfer_requests")
     to_position: Mapped[Optional["Positions"]] = relationship(back_populates="transfer_requests")
 
 class Dependent(Base):
@@ -184,10 +180,10 @@ class Dependent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     employee_id: Mapped[int] = mapped_column(Integer, ForeignKey("employee.id", ondelete="CASCADE"))
     full_name: Mapped[str] = mapped_column(String)
-    relationship: Mapped[dependent_relation] = mapped_column(String)
+    relation: Mapped[dependent_relation] = mapped_column(String)
 
 
-    employee: Mapped["Employee"] = relationship(back_populates="dependents")
+    employee: Mapped["Employee"] = relationship(back_populates="dependent")
     # uselist=False ensures 1-to-1 relationship mapping
     education: Mapped[Optional["Education"]] = relationship(back_populates="dependent", uselist=False, cascade="all, delete-orphan")
 
@@ -235,3 +231,19 @@ class EmployeeLocationStatus(Base):
     location_base_difficulty: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     
     is_location_difficult: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
+class EmployeeTenureCompletionView(Base):
+    __tablename__ = "vw_employee_tenure_completion"
+
+    tenure_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    
+    employee_id: Mapped[int] = mapped_column(Integer)
+    employee_name: Mapped[str] = mapped_column(String)
+    position_id: Mapped[int] = mapped_column(Integer)
+    city: Mapped[str] = mapped_column(String)
+    required_tenure_years: Mapped[int] = mapped_column(Integer)
+    start_date: Mapped[date] = mapped_column(Date)
+    effective_end_date: Mapped[date] = mapped_column(Date)
+    is_tenure_complete: Mapped[bool] = mapped_column(Boolean)
+    
+    time_served: Mapped[timedelta] = mapped_column(Interval)
