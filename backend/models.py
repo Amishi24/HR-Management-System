@@ -168,8 +168,8 @@ class TransferRequest(Base):
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now())    
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now(), onupdate=func.now())
     location_preference: Mapped[Optional[int]] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="SET NULL"), nullable=True)
-    to_position_id: Mapped[List[int]] = mapped_column(ARRAY(SmallInteger), nullable=False, default = list, server_default="'{}'::smallint[]")
-
+    to_position_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("positions.id", ondelete="SET NULL"), nullable=True,)
+    
     employee: Mapped["Employee"] = relationship(foreign_keys=[employee_id], back_populates="transfer_requests")
     approver: Mapped[Optional["Employee"]] = relationship(foreign_keys=[approved_by], back_populates="approved_transfers")
     to_position: Mapped[Optional["Positions"]] = relationship(back_populates="transfer_requests")
@@ -183,7 +183,7 @@ class Dependent(Base):
     relation: Mapped[dependent_relation] = mapped_column(String)
 
 
-    employee: Mapped["Employee"] = relationship(back_populates="dependent")
+    employee: Mapped["Employee"] = relationship(back_populates="dependents")
     # uselist=False ensures 1-to-1 relationship mapping
     education: Mapped[Optional["Education"]] = relationship(back_populates="dependent", uselist=False, cascade="all, delete-orphan")
 
