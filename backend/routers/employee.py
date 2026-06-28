@@ -277,9 +277,6 @@ def delete_dependent_education(
     return {"message": "Education record deleted successfully"}
 
 
-
-
-
 @router.get("/tenures", response_model = list[TenureResponse])
 def get_my_tenures(db: Session = Depends(get_session), employee : Employee = Depends(get_current_employee_record)):
 
