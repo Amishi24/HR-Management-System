@@ -1,37 +1,16 @@
-# ONGC Frontend
+# React + Vite
 
-This is the React + Vite frontend for the ONGC project.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-## Local setup
+Currently, two official plugins are available:
 
-1. Open a terminal in `frontend`
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the dev server:
-   ```bash
-   npm run dev
-   ```
-4. Open the URL shown in the terminal (usually `http://localhost:5173`)
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
-## Backend setup
+## React Compiler
 
-The backend server is in the `backend` folder. Install Python dependencies there:
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
 
-```bash
-cd ../backend
-pip install -r requirements.txt
-```
+## Expanding the Oxlint configuration
 
-Then run the FastAPI server:
-
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-## Notes
-
-- The frontend uses CORS settings that currently allow all origins.
-- In production, change `allow_origins` in `backend/main.py` to your frontend URL.
-- Make sure the backend `.env` file includes `DATABASE_URL` for your database.
+If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
