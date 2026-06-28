@@ -167,7 +167,7 @@ class TransferRequest(Base):
     audit_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now())    
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=False), default=func.now(), server_default=func.now(), onupdate=func.now())
-    location_preference: Mapped[Optional[int]] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="SET NULL"), nullable=True)
+    location_preferences: Mapped[List[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
     to_position_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("positions.id", ondelete="SET NULL"), nullable=True,)
     
     employee: Mapped["Employee"] = relationship(foreign_keys=[employee_id], back_populates="transfer_requests")

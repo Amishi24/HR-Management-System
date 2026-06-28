@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from datetime import date, timedelta
 from sqlalchemy.exc import SQLAlchemyError
 
 from database import get_session
-from models import Employee, Dependent, TenureRecord, Positions, EmployeeTenureCompletionView, Education, Medical
+from models import Employee, Dependent, TenureRecord, Positions, EmployeeTenureCompletionView, Education, Medical, TransferRequest, Location
 from schemas import (
     EmployeeMeResponse, 
     DependentResponse, 
@@ -17,10 +17,21 @@ from schemas import (
     EducationUpdate,
     MedicalResponse,
     MedicalCreate,
-    MedicalUpdate
+    MedicalUpdate,
+    TenureDetailResponse,
+    TransferResponse,
+    TransferCreate,
+    LocationResponse
 )
 
 router = APIRouter()
+
+@router.get("/locations", response_model=list[LocationResponse])
+def read_locations(db: Session = Depends(get_session)):
+    locations = db.query(Location).order_by(Location.id.asc()).all()
+
+    return locations
+    
 
 def get_user_id() -> int:
     return 10001628
@@ -117,7 +128,7 @@ def update_my_dependent(
         return {"message": "Dependent updated successfully"}
 
 
-@router.delete("/dependents/{dependent_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/dependents/{dependent_id}", status_code=status.HTTP_200_OK)
 def delete_my_dependent(
     dependent_id : int,
     db : Session = Depends(get_session),
@@ -233,7 +244,7 @@ def update_dependent_education(
     return {"message": "Education record updated successfully"}
 
 
-@router.delete("/dependents/{dependent_id}/education", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/dependents/{dependent_id}/education", status_code=status.HTTP_200_OK)
 def delete_dependent_education(
     dependent_id: int,
     db: Session = Depends(get_session),
@@ -270,41 +281,81 @@ def delete_dependent_education(
 
 
 @router.get("/tenures", response_model = list[TenureResponse])
-def get_my_tenures(db: Session = Depends(get_session), employee : Employee = Depends(get_current_employee_record), current_user_id: int = Depends(get_user_id)):
+def get_my_tenures(db: Session = Depends(get_session), employee : Employee = Depends(get_current_employee_record)):
+
     tenures = db.query(TenureRecord, EmployeeTenureCompletionView).join(
         EmployeeTenureCompletionView, TenureRecord.id == EmployeeTenureCompletionView.tenure_id
     ).options(
-        joinedload(TenureRecord.position).joinedload(Positions.department),
-        joinedload(TenureRecord.assignments)
-    ).filter(TenureRecord.employee_id == current_user_id).order_by(TenureRecord.start_date.desc()).all()
+        joinedload(TenureRecord.position).joinedload(Positions.department)
+    ).filter(TenureRecord.employee_id == employee.id).order_by(TenureRecord.start_date.desc()).all()
 
     response_data = []
     for t_record, t_view in tenures:
-        req_years = t_record.position.location.required_tenure_years
-        working_days_per_year = t_record.position.location.required_working_days_per_year
-        
-        total_working_days_required = req_years * working_days_per_year
-        
-        calendar_days_served = t_view.time_served.days if t_view.time_served else 0
-        
-        working_days_served = int(calendar_days_served * (working_days_per_year / 365.25))
-        
-        remaining_working_days = total_working_days_required - working_days_served
-        
         response_data.append({
             "id": t_record.id,
             "start_date": t_record.start_date,
             "end_date": t_record.end_date,
             "department_name": t_record.position.department.name,
-            "level": t_record.position.level,
             "location": t_view.city, 
             "is_tenure_complete": t_view.is_tenure_complete,
-            "time_served_days": working_days_served, # Now showing working days!
-            "remaining_days": remaining_working_days if remaining_working_days > 0 else 0,
-            "assignments": t_record.assignments
         })
         
     return response_data
+
+
+@router.get("/tenures/{tenure_id}", response_model=TenureDetailResponse)
+def get_tenure_details(
+    tenure_id : int,
+    db : Session = Depends(get_session),
+    employee : Employee = Depends(get_current_employee_record)
+):
+    result = db.query(TenureRecord, EmployeeTenureCompletionView).join(
+        EmployeeTenureCompletionView , TenureRecord.id == EmployeeTenureCompletionView.tenure_id
+    ).options(
+        joinedload(TenureRecord.position).joinedload(Positions.department),
+        joinedload(TenureRecord.assignments)
+    ).filter(
+        TenureRecord.id == tenure_id,
+        TenureRecord.employee_id == employee.id
+    ).first()
+
+    if not result :
+        raise HTTPException(
+            status_code = status.HTTP_404_NOT_FOUND,
+            detail = "Tenure record not found or access denied"
+        )
+    
+    t_record, t_view = result
+
+    req_years = t_record.position.location.required_tenure_years
+    working_days_per_year = t_record.position.location.required_working_days_per_year
+    total_working_days_required = req_years * working_days_per_year
+    calendar_days_served = t_view.time_served.days if t_view.time_served else 0
+    working_days_served = int(calendar_days_served * (working_days_per_year / 365.25))
+    remaining_working_days = total_working_days_required - working_days_served
+
+    formatted_assignments = []
+    for assignment in t_record.assignments:
+        formatted_assignments.append({
+            "title": assignment.title,
+            "weightage": assignment.weightage,
+            "skills": assignment.skills
+        })
+
+    return {
+        "id": t_record.id,
+        "start_date": t_record.start_date,
+        "end_date": t_record.end_date,
+        "department_name": t_record.position.department.name,
+        "level": t_record.position.level,
+        "location": t_view.city, 
+        "is_tenure_complete": t_view.is_tenure_complete,
+        "time_served_days": working_days_served,
+        "remaining_days": remaining_working_days if remaining_working_days > 0 else 0,
+        
+        "assignments": formatted_assignments 
+    }
+    
     
 
 @router.get("/medical", response_model=list[MedicalResponse])
@@ -358,7 +409,7 @@ def update_my_medical_records(
     db.commit()
     return {"message": "Medical record updated successfully"}
     
-@router.delete("/medical/{medical_id}", status_code = status.HTTP_204_NO_CONTENT)
+@router.delete("/medical/{medical_id}", status_code = status.HTTP_200_OK)
 def delete_my_record(
     medical_id : int,
     employee : Employee = Depends(get_current_employee_record), 
@@ -380,3 +431,83 @@ def delete_my_record(
     return {"message": "Medical record deleted successfully"}
 
 
+@router.get("/transfers", response_model=list[TransferResponse])
+def get_my_transfers(
+    db: Session = Depends(get_session),
+    employee: Employee = Depends(get_current_employee_record)
+):
+
+    transfers = db.query(TransferRequest).filter(
+        TransferRequest.employee_id == employee.id
+    ).order_by(TransferRequest.created_at.desc()).all()
+    
+    return transfers
+
+
+@router.post("/transfers", status_code=status.HTTP_201_CREATED)
+def create_transfer_request(
+    payload: TransferCreate,
+    db: Session = Depends(get_session),
+    employee: Employee = Depends(get_current_employee_record)
+):
+
+    existing_request = db.query(TransferRequest).filter(
+        TransferRequest.employee_id == employee.id,
+        TransferRequest.status == "PROPOSED"
+    ).first()
+
+    if existing_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You already have a pending transfer request. Please cancel it before submitting a new one."
+        )
+
+    valid_locations = db.query(Location.id).filter(Location.id.in_(payload.location_preferences)).all()
+    valid_location_ids = [loc[0] for loc in valid_locations]
+    
+    if len(valid_location_ids) != len(payload.location_preferences):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more of the provided location IDs are invalid."
+        )
+
+    new_transfer = TransferRequest(
+        employee_id=employee.id,
+        status="PROPOSED",
+        location_preferences=payload.location_preferences,
+        audit_notes="Initiated by employee via self-service portal."
+    )
+    
+    db.add(new_transfer)
+    db.commit()
+    db.refresh(new_transfer)
+    
+    return {"message": "Transfer request submitted successfully", "transfer_id": new_transfer.id}
+
+@router.delete("/transfers/{transfer_id}", status_code=status.HTTP_200_OK)
+def cancel_transfer_request(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    employee : Employee = Depends(get_current_employee_record)
+):
+    transfer = db.query(TransferRequest).filter(
+        TransferRequest.id == transfer_id,
+        TransferRequest.employee_id == employee.id
+        ).first()
+    
+    if not transfer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transfer request not found or access denied."
+        )
+    
+    if transfer.status != "PROPOSED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail= f"Cannot cancel a transfer request that is marked as '{transfer.status}'."
+        )
+    
+    db.delete(transfer)
+    db.commit()
+
+    return {"message": "Transfer request cancelled successfully"}

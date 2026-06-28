@@ -12,22 +12,26 @@ class DependentResponse(BaseModel):
 class AssignmentResponse(BaseModel):
     title: str
     weightage: int
+    skills : list[str] = []
     model_config = ConfigDict(from_attributes=True)
 
 class TenureResponse(BaseModel):
     id: int
     start_date: date
     end_date: Optional[date] = None
-
     department_name: str
-    level: int
     location: str
     is_tenure_complete: bool
-    time_served_days: int 
-    remaining_days: int
-    assignments: List[AssignmentResponse] = []
+    model_config = ConfigDict(from_attributes=True)
+
+class TenureDetailResponse(TenureResponse):
+    level : int
+    time_served_days : int
+    remaining_days : int
+    assignments : List[AssignmentResponse] = []
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class EmployeeBase(BaseModel):
     id: int
@@ -93,3 +97,25 @@ class MedicalResponse(BaseModel):
     is_approve: Optional[bool] = False
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class TransferCreate(BaseModel):
+    location_preferences: List[int] = Field(..., min_length=1, max_length=3)
+
+class TransferResponse(BaseModel):
+    id: int
+    status: str
+    audit_notes: Optional[str] = None
+    location_preferences: List[int]
+    created_at: datetime
+    updated_at: datetime
+    
+    model_config = ConfigDict(from_attributes=True)
+
+class LocationResponse(BaseModel):
+    id : int
+    city : str
+    state: str
+
+    model_config = ConfigDict(from_attributes=True)
+
