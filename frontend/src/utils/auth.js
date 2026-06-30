@@ -1,5 +1,27 @@
+// utils/auth.js
+
+export const login = (data) => {
+    localStorage.setItem("employeeId", data.employee_id);
+    localStorage.setItem("employeeName", data.employee_name);
+    localStorage.setItem("role", data.role);
+};
+
+export const logout = () => {
+    localStorage.clear();
+};
+
 export const getEmployeeId = () => {
+    return localStorage.getItem("employeeId");
+};
 
-    return 10001628; // Replace with a valid employee ID from your database
+export const getEmployeeName = () => {
+    return localStorage.getItem("employeeName");
+};
 
+export const getRole = () => {
+    return localStorage.getItem("role");
+};
+
+export const isLoggedIn = () => {
+    return !!localStorage.getItem("employeeId");
 };

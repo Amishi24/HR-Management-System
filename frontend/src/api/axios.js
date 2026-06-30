@@ -7,4 +7,12 @@ const api = axios.create({
     },
 });
 
+api.interceptors.request.use((config) => {
+    const employeeId = localStorage.getItem("employeeId");
+    if (employeeId) {
+        config.headers["employee-id"] = employeeId;
+    }
+    return config;
+});
+
 export default api;
