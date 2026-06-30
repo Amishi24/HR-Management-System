@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session, joinedload, selectinload
 from datetime import date, timedelta
 from sqlalchemy.exc import SQLAlchemyError
@@ -20,7 +20,7 @@ from schemas import (
     MedicalUpdate,
     TenureDetailResponse,
     TransferResponse,
-    TransferLocations,
+    TransferCreate,
     LocationResponse
 )
 
@@ -33,8 +33,8 @@ def read_locations(db: Session = Depends(get_session)):
     return locations
     
 
-def get_user_id() -> int:
-    return 10002589
+def get_user_id(employee_id: int = Header(..., alias="employee-id")):
+    return employee_id
 
 @router.get("", response_model = EmployeeMeResponse)
 def get_profile(db : Session = Depends(get_session), current_user_id: int = Depends(get_user_id)):
@@ -443,7 +443,7 @@ def get_my_transfers(
 
 @router.post("/transfers", status_code=status.HTTP_201_CREATED)
 def create_transfer_request(
-    payload: TransferLocations,
+    payload: TransferCreate,
     db: Session = Depends(get_session),
     employee: Employee = Depends(get_current_employee_record)
 ):
@@ -487,7 +487,7 @@ def create_transfer_request(
 @router.patch("/transfers/{transfer_id}/preferences")
 def submit_transfer_preferences(
     transfer_id: int,
-    payload: TransferLocations,
+    payload: TransferCreate,
     db: Session = Depends(get_session),
     employee: Employee = Depends(get_current_employee_record)
 ):
@@ -525,7 +525,7 @@ def submit_transfer_preferences(
     
     current_notes = transfer.audit_notes or ""
     transfer.audit_notes = f"{current_notes} | Locations submitted/updated by employee on {date.today()}."
-
+    
     db.commit()
     
     return {"message": "Location preferences submitted successfully."}

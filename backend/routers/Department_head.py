@@ -2,26 +2,28 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import select
 from datetime import date, timedelta
-from database import get_session
-from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status
-from schemas import (TransferLocations, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferReviewPayload, TransferAlertResponse,TransferInitiatePayload)
 
-# Assuming you placed the dependency we discussed in a dependencies.py file
-# from dependencies import get_current_dept_head 
+from database import get_session
+# Note: Added EmployeeRole and Role to the imports
+from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role
+from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferReviewPayload, TransferAlertResponse, TransferInitiatePayload)
 
 def get_user_id() -> int:
     return 10002589
 
 router = APIRouter()
 
-
+# ==========================================
+# 1. SECURITY: The Updated RBAC Bouncer
+# ==========================================
 def get_current_dept_head(
         db: Session = Depends(get_session),
         current_user_id : int = Depends(get_user_id)
 ) -> Employee:
     
     employee = db.query(Employee).options(
-        joinedload(Employee.roles),
+        # FIX: We now jump across the Association Object (EmployeeRole) to get to the actual Role
+        joinedload(Employee.employee_roles).joinedload(EmployeeRole.role),
         joinedload(Employee.current_position)
     ).filter(Employee.id == current_user_id).first()
 
@@ -31,9 +33,11 @@ def get_current_dept_head(
             detail = "Employee not found"
         )
     
-    user_roles = [role.role_name for role in employee.roles]
+    # FIX: Loop through the association objects to extract the role names
+    user_roles = [er.role.role_name for er in employee.employee_roles if er.role]
 
-    if "dept_head" not in user_roles:
+    # Added a safeguard to check for both case variations depending on what you seed your DB with
+    if "DEPT_HEAD" not in user_roles and "dept_head" not in user_roles:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Elevated privileges required. You do not have the DEPT_HEAD role."
@@ -49,14 +53,9 @@ def get_current_dept_head(
     
 
 def get_team_jurisdiction_query(dept_head: Employee, db: Session):
-    """
-    Returns a base SQLAlchemy query filtered for employees within 
-    the Department Head's location and hierarchical department structure.
-    """
     head_loc_id = dept_head.current_position.location_id
     head_dept_id = dept_head.current_position.department_id
 
-    # 1. The Recursive CTE: Find the root dept and all sub-departments
     hierarchy = db.query(Department.id).filter(
         Department.id == head_dept_id
     ).cte(name="dept_hierarchy", recursive=True)
@@ -66,15 +65,15 @@ def get_team_jurisdiction_query(dept_head: Employee, db: Session):
         db.query(dept_alias.id).filter(dept_alias.parent_id == hierarchy.c.id)
     )
 
-    # 2. Return the filtered base query for employees
     query = db.query(Employee).join(
         Positions, Employee.current_position_id == Positions.id
     ).filter(
         Positions.location_id == head_loc_id,
-        Positions.department_id.in_(db.query(hierarchy.c.id))
+        Positions.department_id.in_(select(hierarchy.c.id))
     )
     
     return query
+
 
 # ==========================================
 # ROUTES: Team Visibility
@@ -84,9 +83,6 @@ def get_my_team(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    """List all employees under this Department Head's jurisdiction."""
-    # TODO: Execute get_team_jurisdiction_query
-    # TODO: Format and return TeamMemberLightResponse
     base_query = get_team_jurisdiction_query(dept_head, db)
 
     employees = base_query.options(
@@ -113,9 +109,6 @@ def get_team_member_details(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    """Deep dive into a specific team member's professional profile."""
-    # TODO: Ensure employee_id is within jurisdiction
-    # TODO: Return their tenures, skills, and current assignment
     base_query = get_team_jurisdiction_query(dept_head, db)
 
     if not base_query.filter(Employee.id == employee_id).first():
@@ -129,7 +122,8 @@ def get_team_member_details(
         joinedload(Employee.current_position).joinedload(Positions.department),
         joinedload(Employee.dependents),
         joinedload(Employee.tenure_records).joinedload(TenureRecord.assignments),
-        joinedload(Employee.transfer_requests.and_(TransferRequest.status == "PROPOSED"))
+        # FIX: Using the enum's .name to match the String mapping in models.py
+        joinedload(Employee.transfer_requests.and_(TransferRequest.status == transfer_status.PROPOSED.name))
     ).filter(Employee.id == employee_id).first()
 
     return {
@@ -158,10 +152,12 @@ def get_team_member_details(
                 "assignments": t.assignments
             } for t in emp_data.tenure_records
         ]
-        
     }
 
 
+# ==========================================
+# ROUTES: Transfer Workflows
+# ==========================================
 @router.get("/transfers/alerts", response_model=list[TransferAlertResponse])
 def get_mandatory_transfer_alerts(
     db : Session = Depends(get_session),
@@ -204,13 +200,13 @@ def get_mandatory_transfer_alerts(
 
     return alerts
 
+
 @router.post("/transfers/initiate", status_code=status.HTTP_201_CREATED)
 def initiate_employee_transfer(
     payload: TransferInitiatePayload,
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-
     jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
     target_employee = jurisdiction_query.options(
         joinedload(Employee.tenure_records)
@@ -230,9 +226,9 @@ def initiate_employee_transfer(
             detail="Transfer blocked. Minimum 3-year lock-in rule not met."
         )
 
-
     new_transfer = TransferRequest(
         employee_id=payload.employee_id,
+        # FIX: Ensure we use the string value since the DB column expects a String
         status=transfer_status.PROPOSED.name, 
         approved_by=dept_head.id,
         audit_notes=payload.reason,
@@ -246,19 +242,13 @@ def initiate_employee_transfer(
         "message": "Transfer initiated. Employee has been flagged to provide preferences.", 
         "transfer_id": new_transfer.id
     }
-        
 
 
-# ==========================================
-# ROUTES: Transfer Workflows
-# ==========================================
 @router.get("/transfers", response_model=list[TransferResponse])
 def get_pending_team_transfers(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    """View all 'PROPOSED' transfers involving the Head's team."""
-    # TODO: Query TransferRequests linked to employees in jurisdiction
     pass
 
 @router.patch("/transfers/{transfer_id}/review")
@@ -268,10 +258,6 @@ def review_transfer_request(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    """Accept or Reject a proposed transfer."""
-    # TODO: Verify transfer exists and belongs to a jurisdiction employee
-    # TODO: Update status to DEPT_APPROVED or REJECTED
-    # TODO: Append the payload.review_notes to the audit trail
     pass
 
 @router.get("/transfers/{transfer_id}/context")
@@ -280,10 +266,4 @@ def view_transfer_medical_education_context(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    """
-    Specialized privacy gateway. Only returns medical/dependent data 
-    if the transfer was explicitly flagged for those reasons.
-    """
-    # TODO: Verify jurisdiction and transfer reason
-    # TODO: Temporarily expose relevant context for decision making
     pass

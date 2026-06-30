@@ -132,9 +132,8 @@ class Employee(Base):
     transfer_requests: Mapped[List["TransferRequest"]] = relationship(foreign_keys="[TransferRequest.employee_id]", back_populates="employee", cascade="all, delete-orphan")
     approved_transfers: Mapped[List["TransferRequest"]] = relationship(foreign_keys="[TransferRequest.approved_by]", back_populates="approver")
     
-    roles: Mapped[List["Roles"]] = relationship(
-        secondary="emp_role", back_populates="employees"
-    )
+    employee_roles: Mapped[List["EmployeeRole"]] = relationship(back_populates="employee", cascade="all, delete-orphan")
+
 
 class TenureRecord(Base):
     __tablename__ = "tenurerecord"
@@ -214,22 +213,21 @@ class Medical(Base):
    
     employee: Mapped["Employee"] = relationship(back_populates="medical_records")
 
-class Roles(Base):
+class Role(Base):
     __tablename__ = "roles"
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
     role_name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
-    employees: Mapped[List["Employee"]] = relationship(
-        secondary="emp_role", back_populates="roles"
-    )
+    employees: Mapped[List["EmployeeRole"]] = relationship(back_populates="role")
 
-# Association table for the many-to-many relationship between Employee and Roles
-emp_role = Table(
-    "emp_role",
-    Base.metadata,
-    Column("emp_id", Integer, ForeignKey("employee.id", ondelete="CASCADE"), primary_key=True),
-    Column("role_id", SmallInteger, ForeignKey("roles.id", ondelete="CASCADE"), primary_key=True),
-)
+
+class EmployeeRole(Base):
+    __tablename__ = "emp_role"
+
+    emp_id : Mapped[int] = mapped_column(Integer, ForeignKey("employee.id"), primary_key=True)
+    role_id : Mapped[int] = mapped_column(SmallInteger, ForeignKey("roles.id"), primary_key=True)
+    employee: Mapped["Employee"] = relationship(back_populates="employee_roles")
+    role: Mapped["Role"] = relationship("Role", back_populates="employees")
 
 class DependentDetailsView(Base):
     __tablename__ = "vw_dependent_details"

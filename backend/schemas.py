@@ -101,7 +101,7 @@ class MedicalResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TransferLocations(BaseModel):
+class TransferCreate(BaseModel):
     location_preferences: List[int] = Field(..., min_length=1, max_length=3)
 
 class TransferResponse(BaseModel):
@@ -161,3 +161,13 @@ class TransferInitiatePayload(BaseModel):
     employee_id: int
     # We will expand this later based on your final input requirements
     reason: Optional[str] = "Initiated by Department Head."
+
+
+class LoginRequest(BaseModel):
+    employee_id: int
+    # password: str | None = None
+
+class LoginResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    role: str
