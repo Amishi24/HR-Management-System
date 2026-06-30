@@ -2,6 +2,8 @@ from datetime import date, datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+
+# employeeMe
 class DependentResponse(BaseModel):
     id: int
     full_name: str
@@ -99,7 +101,7 @@ class MedicalResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TransferCreate(BaseModel):
+class TransferLocations(BaseModel):
     location_preferences: List[int] = Field(..., min_length=1, max_length=3)
 
 class TransferResponse(BaseModel):
@@ -119,3 +121,43 @@ class LocationResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+# Department_head
+
+class LightTeamEmployeeResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    discipline: str
+    Assigned_department: str
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DetailedEmployeeResponse(EmployeeMeResponse):
+    tenures: List[TenureDetailResponse] = []
+
+    active_transfers : List[TransferResponse] = []
+
+    dependents: List[DependentResponse] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TransferReviewPayload(BaseModel):
+    action: str = Field(..., description="The review action, e.g., 'DEPT_APPROVED' or 'REJECTED'.")
+    review_notes: Optional[str] = None
+
+class TransferAlertResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    current_state: str
+    current_city: str
+    department_name: str
+    tenure_start_date: date
+    years_served: float 
+    alert_type: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+class TransferInitiatePayload(BaseModel):
+    employee_id: int
+    # We will expand this later based on your final input requirements
+    reason: Optional[str] = "Initiated by Department Head."

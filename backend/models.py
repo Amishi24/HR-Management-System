@@ -144,7 +144,7 @@ class TenureRecord(Base):
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     position_id: Mapped[int] = mapped_column(Integer, ForeignKey("positions.id", ondelete="CASCADE"))
-    location_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("location.id"), ondelete="CASCADE")
+    location_id: Mapped[int] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="CASCADE"))
 
     employee: Mapped["Employee"] = relationship(back_populates="tenure_records")
     position: Mapped["Positions"] = relationship(back_populates="tenure_records")
