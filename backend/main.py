@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from database import get_session
 from models import Location, Employee
 from schemas import LocationResponse
-from routers import employee, login
+from routers import employee, login, Department_head
 
 # Initialize the FastAPI application
 app = FastAPI(title="ONGC HR Management System")
@@ -22,6 +22,7 @@ app.add_middleware(
 
 app.include_router(employee.router, prefix="/me", tags=["employee[self]"])
 app.include_router(login.router, prefix="/auth", tags=["Authentication"])
+app.include_router(Department_head.router, prefix="/dept-head", tags=["Department Head"])
 
 @app.get("/")
 def health_check():

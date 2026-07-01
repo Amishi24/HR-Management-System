@@ -171,3 +171,25 @@ class LoginResponse(BaseModel):
     employee_id: int
     employee_name: str
     role: str
+
+class SubDepartmentResponse(BaseModel):
+    id: int
+    name: str
+    parent_dept: Optional[str] = None   
+    depth: int
+    model_config = ConfigDict(from_attributes=True)
+
+class DepartmentTransferResponse(TransferResponse):
+    employee_id: int
+    employee_name: str
+    current_department: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TransferReviewPayload(BaseModel):
+    status: str = Field(
+        ..., 
+        pattern="^(APPROVED|CANCELLED)$", 
+        description="Must be exactly 'APPROVED' or 'CANCELLED'."
+    )
+    review_notes: str
