@@ -13,6 +13,7 @@ class Base(DeclarativeBase):
 
 class transfer_status(enum.Enum):
     PROPOSED = "Proposed"
+    APPEALED = "Appealed"
     APPROVED = "Approved"
     SUCCESSOR_ASSIGNED = "Successor Assigned"
     HANDOVER_IN_PROGRESS = "Handover In Progress"

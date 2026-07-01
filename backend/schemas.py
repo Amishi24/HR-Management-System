@@ -193,3 +193,28 @@ class TransferReviewPayload(BaseModel):
         description="Must be exactly 'APPROVED' or 'CANCELLED'."
     )
     review_notes: str
+
+class TransferAppealPayload(BaseModel):
+    appeal_type: str = Field(..., pattern="^(MEDICAL|EDUCATION)$")
+    appeal_notes: str
+
+class ExemptionContextResponse(BaseModel):
+    medical_issues: list[str] = []
+    board_exam_children: list[str] = []
+
+class AppealDecisionPayload(BaseModel):
+    decision: str = Field(..., pattern="^(ACCEPT_APPEAL|REJECT_APPEAL)$")
+    manager_notes: str
+
+class CapacityDashboardResponse(BaseModel):
+    department_name: str
+    discipline_name: str
+    level: int
+    max_strength: int
+    current_active: int
+    vacancies: int
+
+class AssignmentCreatePayload(BaseModel):
+    title: str
+    weightage: int = Field(..., ge=1, le=10, description="Weightage must be between 1 and 10")
+    skills: List[str] = []

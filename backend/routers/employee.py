@@ -21,7 +21,8 @@ from schemas import (
     TenureDetailResponse,
     TransferResponse,
     TransferCreate,
-    LocationResponse
+    LocationResponse,
+    TransferAppealPayload
 )
 
 router = APIRouter()
@@ -482,6 +483,47 @@ def create_transfer_request(
     return {"message": "Transfer request submitted successfully", "transfer_id": new_transfer.id}
 
 
+@router.patch("/transfers/{transfer_id}/appeal")
+def appeal_mandatory_transfer(
+    transfer_id: int,
+    payload: TransferAppealPayload,
+    db: Session = Depends(get_session),
+    employee: Employee = Depends(get_current_employee_record)
+):
+    transfer = db.query(TransferRequest).filter(
+        TransferRequest.id == transfer_id,
+        TransferRequest.employee_id == employee.id
+    ).first()
+
+    if not transfer or transfer.status != transfer_status.PROPOSED.name:
+        raise HTTPException(status_code=400, detail="Transfer not found or not in PROPOSED state.")
+
+    if payload.appeal_type == "MEDICAL":
+        has_medical = db.query(Medical).filter(
+            Medical.employee_id == employee.id,
+            Medical.is_approve == True
+        ).first()
+        if not has_medical:
+            raise HTTPException(status_code=400, detail="No approved medical records found to support this appeal.")
+
+    elif payload.appeal_type == "EDUCATION":
+        has_board_child = db.query(Dependent).join(Education).filter(
+            Dependent.employee_id == employee.id,
+            Dependent.relation == "Child",
+            Education.curr_class.in_([9, 11])
+        ).all()
+        if not has_board_child:
+            raise HTTPException(status_code=400, detail="No dependent children currently registered in 9th or 11th class.")
+
+
+    transfer.status = transfer_status.APPEALED.name
+    
+    current_notes = transfer.audit_notes or ""
+    today_str = date.today().isoformat()
+    transfer.audit_notes = f"{current_notes} | [Employee Appealed ({payload.appeal_type}) - {today_str}]: {payload.appeal_notes}"
+
+    db.commit()
+    return {"message": "Transfer appeal submitted successfully. Awaiting Department Head review."}
 
 
 @router.patch("/transfers/{transfer_id}/preferences")
@@ -529,6 +571,7 @@ def submit_transfer_preferences(
     db.commit()
     
     return {"message": "Location preferences submitted successfully."}
+
 
 
 @router.delete("/transfers/{transfer_id}", status_code=status.HTTP_200_OK)

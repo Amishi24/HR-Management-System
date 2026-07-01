@@ -1,17 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload, aliased
-from sqlalchemy import select, literal
+from sqlalchemy import select, literal, func
 from datetime import date, timedelta
 from typing import List, Optional
 from database import get_session
 # Note: Added EmployeeRole and Role to the imports
-from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role, EmployeeTenureCompletionView
+from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role, EmployeeTenureCompletionView, Medical, Dependent, Education, Department, DepartmentDisciplineCapacity, Discipline, Assignment
 from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferReviewPayload, TransferAlertResponse, TransferInitiatePayload,
                      SubDepartmentResponse,
                      DepartmentTransferResponse,
-                     TransferReviewPayload
-                     
-                     )
+                     TransferReviewPayload,
+                     ExemptionContextResponse,
+                     AppealDecisionPayload,
+                     CapacityDashboardResponse,
+                     AssignmentCreatePayload,
+                    )
 
 def get_user_id() -> int:
     return 10002589
@@ -485,10 +488,203 @@ def review_transfer_request(
     }
 
 
-@router.get("/transfers/{transfer_id}/context")
-def view_transfer_medical_education_context(
+@router.get("/transfers/{transfer_id}/context", response_model=ExemptionContextResponse)
+def view_transfer_exemption_context(
     transfer_id: int,
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    pass
+    """
+    Privacy Gateway: Only exposes sensitive medical/dependent data 
+    if the transfer is actively under appeal.
+    """
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    allowed_ids = jurisdiction_query.with_entities(Employee.id)
+
+    transfer = db.query(TransferRequest).filter(
+        TransferRequest.id == transfer_id,
+        TransferRequest.employee_id.in_(allowed_ids)
+    ).first()
+
+    if not transfer or transfer.status != transfer_status.APPEALED.name:
+        raise HTTPException(status_code=403, detail="Context unavailable. Transfer is not currently under appeal.")
+
+    medical_records = db.query(Medical).filter(
+        Medical.employee_id == transfer.employee_id, Medical.is_approve == True
+    ).all()
+    
+    board_children = db.query(Dependent).join(Education).filter(
+        Dependent.employee_id == transfer.employee_id,
+        Dependent.relation == "Child",
+        Education.curr_class.in_([9, 11])
+    ).all()
+
+    return {
+        "medical_issues": [m.issue for m in medical_records if m.issue],
+        "board_exam_children": [f"{c.full_name} (Class {c.education.curr_class})" for c in board_children]
+    }
+
+
+@router.patch("/transfers/{transfer_id}/appeal-decision")
+def review_transfer_appeal(
+    transfer_id: int,
+    payload: AppealDecisionPayload,
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    """
+    Dept Head decides the fate of the appealed transfer.
+    """
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    allowed_ids = jurisdiction_query.with_entities(Employee.id)
+
+    transfer = db.query(TransferRequest).filter(
+        TransferRequest.id == transfer_id,
+        TransferRequest.employee_id.in_(allowed_ids)
+    ).first()
+
+    if not transfer or transfer.status != transfer_status.APPEALED.name:
+        raise HTTPException(status_code=400, detail="Transfer is not currently awaiting an appeal decision.")
+
+    today_str = date.today().isoformat()
+    current_notes = transfer.audit_notes or ""
+
+    if payload.decision == "ACCEPT_APPEAL":
+        transfer.status = transfer_status.CANCELLED.name
+        transfer.audit_notes = f"{current_notes} | [Dept Head ACCEPTED Appeal - {today_str}]: {payload.manager_notes}"
+    else:
+        transfer.status = transfer_status.PROPOSED.name
+        transfer.audit_notes = f"{current_notes} | [Dept Head REJECTED Appeal - {today_str}]: {payload.manager_notes}"
+
+    transfer.approved_by = dept_head.id
+    db.commit()
+
+    return {"message": f"Appeal decision recorded. Transfer is now {transfer.status}."}
+
+
+@router.get("/capacity-dashboard", response_model=list[CapacityDashboardResponse])
+def get_department_capacity(
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    """
+    Shows the workforce gap analysis: Max Allowed Strength vs Actual Vacancies.
+    """
+
+    head_dept_id = dept_head.current_position.department_id
+    
+    tree_cte = select(Department.id).where(Department.id == head_dept_id).cte(name="dept_tree", recursive=True)
+    tree_alias = aliased(Department)
+    tree_cte = tree_cte.union_all(
+        select(tree_alias.id).where(tree_alias.parent_id == tree_cte.c.id)
+    )
+    jurisdiction_dept_ids = select(tree_cte.c.id)
+
+
+    capacities = db.query(
+        Department.name.label("dept_name"),
+        Discipline.name.label("disc_name"),
+        DepartmentDisciplineCapacity.level,
+        DepartmentDisciplineCapacity.max_strength,
+        func.count(Positions.id).filter(Positions.is_vacant == False).label("current_active")
+    ).select_from(DepartmentDisciplineCapacity).join(
+        Department, Department.id == DepartmentDisciplineCapacity.department_id
+    ).join(
+        Discipline, Discipline.id == DepartmentDisciplineCapacity.discipline_id
+    ).outerjoin(
+        Positions, 
+        (Positions.department_id == DepartmentDisciplineCapacity.department_id) &
+        (Positions.discipline_id == DepartmentDisciplineCapacity.discipline_id) &
+        (Positions.level == DepartmentDisciplineCapacity.level)
+    ).filter(
+        DepartmentDisciplineCapacity.department_id.in_(jurisdiction_dept_ids)
+    ).group_by(
+        Department.name,
+        Discipline.name,
+        DepartmentDisciplineCapacity.level,
+        DepartmentDisciplineCapacity.max_strength
+    ).all()
+
+
+    return [
+        {
+            "department_name": cap.dept_name,
+            "discipline_name": cap.disc_name,
+            "level": cap.level,
+            "max_strength": cap.max_strength,
+            "current_active": cap.current_active,
+            "vacancies": cap.max_strength - cap.current_active if cap.max_strength is not None and cap.current_active is not None else 0
+        } for cap in capacities
+    ]
+
+
+@router.post("/team/{employee_id}/tenures/{tenure_id}/assignments", status_code=status.HTTP_201_CREATED)
+def create_employee_assignment(
+    employee_id: int,
+    tenure_id: int,
+    payload: AssignmentCreatePayload,
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    """
+    Assigns a new project/task to a team member's specific tenure.
+    """
+
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    if not jurisdiction_query.filter(Employee.id == employee_id).first():
+        raise HTTPException(status_code=403, detail="Employee not in your jurisdiction.")
+
+  
+    tenure = db.query(TenureRecord).filter(
+        TenureRecord.id == tenure_id,
+        TenureRecord.employee_id == employee_id
+    ).first()
+
+    if not tenure:
+        raise HTTPException(status_code=404, detail="Tenure record not found.")
+
+
+    new_assignment = Assignment(
+        tenurerecord_id=tenure.id,
+        title=payload.title,
+        weightage=payload.weightage,
+        skills=payload.skills
+    )
+    
+    db.add(new_assignment)
+    db.commit()
+    
+    return {"message": "Assignment created successfully.", "assignment_id": new_assignment.id}
+
+
+@router.delete("/team/{employee_id}/assignments/{assignment_id}", status_code=status.HTTP_200_OK)
+def delete_employee_assignment(
+    employee_id: int,
+    assignment_id: int,
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    """
+    Allows the Dept Head to delete a task/project from an employee's workload.
+    """
+
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    if not jurisdiction_query.filter(Employee.id == employee_id).first():
+        raise HTTPException(status_code=403, detail="Employee not in your jurisdiction.")
+
+
+    assignment = db.query(Assignment).join(
+        TenureRecord, Assignment.tenurerecord_id == TenureRecord.id
+    ).filter(
+        Assignment.id == assignment_id,
+        TenureRecord.employee_id == employee_id
+    ).first()
+
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found or does not belong to this employee.")
+
+  
+    db.delete(assignment)
+    db.commit()
+    
+    return {"message": "Assignment deleted successfully."}
