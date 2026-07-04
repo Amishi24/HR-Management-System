@@ -6,7 +6,7 @@ from typing import List, Optional
 from database import get_session
 # Note: Added EmployeeRole and Role to the imports
 from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role, EmployeeTenureCompletionView, Medical, Dependent, Education, Department, DepartmentDisciplineCapacity, Discipline, Assignment
-from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferReviewPayload, TransferAlertResponse, TransferInitiatePayload,
+from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferAlertResponse, TransferInitiatePayload,
                      SubDepartmentResponse,
                      DepartmentTransferResponse,
                      TransferReviewPayload,

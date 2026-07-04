@@ -1,13 +1,11 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 # Import our setup from the files we just created
 from database import get_session
-from models import Location, Employee
-from schemas import LocationResponse
-from routers import employee, login, Department_head
+from routers import employee, login, Department_head, Location_head
 
 # Initialize the FastAPI application
 app = FastAPI(title="ONGC HR Management System")
@@ -23,6 +21,7 @@ app.add_middleware(
 app.include_router(employee.router, prefix="/me", tags=["employee[self]"])
 app.include_router(login.router, prefix="/auth", tags=["Authentication"])
 app.include_router(Department_head.router, prefix="/dept-head", tags=["Department Head"])
+app.include_router(Location_head.router, prefix="/loc-head", tags=["Location Head"])
 
 @app.get("/")
 def health_check():

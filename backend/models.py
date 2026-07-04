@@ -1,8 +1,6 @@
 from __future__ import annotations
 import enum
 from typing import List, Optional
-from datetime import date, datetime
-from sqlalchemy import CheckConstraint, String, Integer, SmallInteger, Boolean, Date, DateTime, ForeignKey, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship, DeclarativeBase
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy import (CheckConstraint, Column, Date, DateTime, ForeignKey, Integer, Interval, SmallInteger, String, Table, Text, func, Boolean)
@@ -22,7 +20,7 @@ class transfer_status(enum.Enum):
 
 class policy_scope(enum.Enum):
     GLOBAL = "Global"
-    DEPARTMENT = "Department"
+    LOCAL = "Local"
 
 class dependent_relation(enum.Enum):
     Spouse = "Spouse"
@@ -41,6 +39,7 @@ class Location(Base):
     required_working_days_per_year: Mapped[int] = mapped_column(Integer, nullable=False, default=240)
 
     positions: Mapped[List["Positions"]] = relationship(back_populates="location")
+    rotation_policies: Mapped[List["RotationPolicy"]] = relationship(back_populates="location", cascade="all, delete-orphan")
 
 class Department(Base):
     __tablename__ = "department"
@@ -73,9 +72,10 @@ class RotationPolicy(Base):
 
     id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, index=True)
     scope_type: Mapped[policy_scope] = mapped_column(String(50), nullable=False)
-    scope_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    scope_id: Mapped[Optional[int]] = mapped_column(SmallInteger, ForeignKey("location.id", ondelete="CASCADE"), nullable=True)
     rules_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=lambda: {})
 
+    location: Mapped[Optional["Location"]] = relationship(back_populates="rotation_policies")
 class DepartmentDisciplineCapacity(Base):
     __tablename__ = "departmentdisciplinecapacity"
 

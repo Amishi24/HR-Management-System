@@ -1,6 +1,19 @@
 from datetime import date, datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from models import policy_scope
+
+
+# LOGIN 
+class LoginRequest(BaseModel):
+    employee_id: int
+    # password: str | None = None
+
+class LoginResponse(BaseModel):
+    employee_id: int
+    employee_name: str
+    role: str
 
 
 # employeeMe
@@ -141,9 +154,6 @@ class DetailedEmployeeResponse(EmployeeMeResponse):
 
     model_config = ConfigDict(from_attributes=True)
 
-class TransferReviewPayload(BaseModel):
-    action: str = Field(..., description="The review action, e.g., 'DEPT_APPROVED' or 'REJECTED'.")
-    review_notes: Optional[str] = None
 
 class TransferAlertResponse(BaseModel):
     employee_id: int
@@ -160,17 +170,7 @@ class TransferAlertResponse(BaseModel):
 class TransferInitiatePayload(BaseModel):
     employee_id: int
     # We will expand this later based on your final input requirements
-    reason: Optional[str] = "Initiated by Department Head."
-
-
-class LoginRequest(BaseModel):
-    employee_id: int
-    # password: str | None = None
-
-class LoginResponse(BaseModel):
-    employee_id: int
-    employee_name: str
-    role: str
+    reason: Optional[str] = "Initiated by your head."
 
 class SubDepartmentResponse(BaseModel):
     id: int
@@ -189,8 +189,8 @@ class DepartmentTransferResponse(TransferResponse):
 class TransferReviewPayload(BaseModel):
     status: str = Field(
         ..., 
-        pattern="^(APPROVED|CANCELLED)$", 
-        description="Must be exactly 'APPROVED' or 'CANCELLED'."
+        pattern="^(APPROVED|CANCELLED|REJECTED)$", 
+        description="Must be a valid review state."
     )
     review_notes: str
 
@@ -218,3 +218,74 @@ class AssignmentCreatePayload(BaseModel):
     title: str
     weightage: int = Field(..., ge=1, le=10, description="Weightage must be between 1 and 10")
     skills: List[str] = []
+
+
+# Location Head
+class LocationDetailsResponse(BaseModel):
+    id: int
+    city: str
+    state: Optional[str] = None
+    region: Optional[str] = None
+    is_difficult: bool
+    required_tenure_years: int
+    required_working_days_per_year: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+class UpdateLocationRequirementsRequest(BaseModel):
+    required_tenure_years: Optional[int] = Field(None, ge=0)
+    required_working_days_per_year: Optional[int] = Field(None, ge=0, le=365)
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PositionDetailsResponse(BaseModel):
+    id: int
+    department_name: str
+    discipline_name: Optional[str] = None
+    level: int
+    is_vacant: bool 
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PositionCreateRequest(BaseModel):
+    level: int = Field(..., ge=1, le=8)
+    department_id: int
+    discipline_id: Optional[int] = None
+    is_vacant: bool = True
+
+class PositionUpdateRequest(BaseModel):
+    level: Optional[int] = Field(None, ge=1, le=8)
+    department_id: Optional[int] = None
+    discipline_id: Optional[int] = None
+    is_vacant: Optional[bool] = None
+
+
+class DepartmentLookupResponse(BaseModel):
+    id: int
+    name: str
+    parent_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class DisciplineLookupResponse(BaseModel):
+    id: int
+    name: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LevelGatingRules(BaseModel):
+    lateral_only: List[int] = Field(default_factory=list)
+    promotions_allowed: List[int] = Field(default_factory=list)
+
+class RulesConfigPayload(BaseModel):
+    level_gating: LevelGatingRules
+
+class RotationPolicyResponse(BaseModel):
+    id: int
+    rules_config: Dict
+
+    model_config = ConfigDict(from_attributes=True)
+
+class RotationPolicyCreateUpdate(BaseModel):
+    rules_config: RulesConfigPayload
