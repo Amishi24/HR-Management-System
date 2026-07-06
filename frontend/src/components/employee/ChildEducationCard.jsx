@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import SectionCard from "./SectionCard";
@@ -19,11 +19,7 @@ export default function ChildEducationCard({ dependents = [] }) {
     // Track records queued for backend deletion
     const [pendingDeletes, setPendingDeletes] = useState([]);
 
-    useEffect(() => {
-        fetchChildren();
-    }, [dependents]);
-
-    async function fetchChildren() {
+    const fetchChildren = useCallback(async () => {
         try {
             setLoading(true);
             const childDependents = dependents.filter(
@@ -48,7 +44,11 @@ export default function ChildEducationCard({ dependents = [] }) {
         } finally {
             setLoading(false);
         }
-    }
+    }, [dependents]);
+
+    useEffect(() => {
+        fetchChildren();
+    }, [fetchChildren]);
 
     // Instantly initializes an item locally without triggering a network call
     function handleLocalCreate(childId) {

@@ -5,7 +5,6 @@ import IdentityCard from "../components/employee/IdentityCard";
 import DependentsCard from "../components/employee/DependentsCard";
 import ChildEducationCard from "../components/employee/ChildEducationCard";
 import MedicalCard from "../components/employee/MedicalCard";
-import SectionCard from "../components/employee/SectionCard";
 
 
 export default function EmployeeProfilePage() {

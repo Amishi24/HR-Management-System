@@ -1,5 +1,4 @@
 import TransferRequestsCard from "../components/employee/TransferRequestsCard";
-import SectionCard from "../components/employee/SectionCard";
 
 export default function TransferRequestsPage() {
     return (

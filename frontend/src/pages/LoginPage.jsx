@@ -6,33 +6,48 @@ import { login } from "../utils/auth";
 export default function LoginPage() {
     const [employeeId, setEmployeeId] = useState("");
     const [password, setPassword] = useState("");
+    const [selectedRole, setSelectedRole] = useState("EMPLOYEE");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    
+
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(null);
+
+        if (selectedRole === "SUPER_ADMIN") {
+            setError("Coming soon");
+            return;
+        }
+
         setLoading(true);
 
         try {
-            // Call your backend authentication route
-            const data = await loginEmployee(employeeId, password);
-            
-            // Expected payload fallback block matching your utils/auth structure
-            // e.g., { employee_id: "...", role: "EMPLOYEE" }
+            const data = await loginEmployee(employeeId);
+            const backendRole = (data.role || "EMPLOYEE").toUpperCase();
+            const claimedRole = selectedRole.toUpperCase();
+
+            if (claimedRole !== backendRole) {
+                setError(`Selected role does not match the account role.`);
+                return;
+            }
+
             login({
                 employee_id: data.employee_id || employeeId,
                 employee_name: data.employee_name,
-                role: data.role || "EMPLOYEE"
+                role: backendRole,
             });
 
-            // Redirect user directly to the employee dashboard route
-            navigate("/employee");
+            if (backendRole === "DEPT_HEAD" || backendRole === "LOC_HEAD") {
+                navigate("/role-landing", { replace: true });
+            } else {
+                navigate("/employee/dashboard", { replace: true });
+            }
         } catch (err) {
             console.error("Login failure:", err);
-            setError(err.response?.data?.message || "Invalid credentials. Please try again.");
+            const errorMessage = err.response?.data?.detail || err.response?.data?.message || "Unable to sign in with that employee ID.";
+            setError(errorMessage);
         } finally {
             setLoading(false);
         }
@@ -69,10 +84,12 @@ export default function LoginPage() {
                         <input
                             id="employeeId"
                             type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
                             required
                             placeholder="Enter your employee ID"
                             value={employeeId}
-                            onChange={(e) => setEmployeeId(e.target.value)}
+                            onChange={(e) => setEmployeeId(e.target.value.replace(/\D/g, ""))}
                             disabled={loading}
                             className="w-full bg-[#f1f5f9] border border-transparent focus:border-slate-200 focus:bg-white text-slate-800 placeholder-slate-400 text-sm rounded-lg px-4 py-3 transition-all outline-hidden"
                         />
@@ -85,13 +102,37 @@ export default function LoginPage() {
                         <input
                             id="password"
                             type="password"
-                            required
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             disabled={loading}
                             className="w-full bg-[#f1f5f9] border border-transparent focus:border-slate-200 focus:bg-white text-slate-800 placeholder-slate-400 text-sm rounded-lg px-4 py-3 transition-all outline-hidden"
                         />
+                    </div>
+
+                    <div>
+                        <label htmlFor="role" className="block text-sm font-semibold text-slate-700 mb-1.5">
+                            Role
+                        </label>
+                        <div className="relative">
+                            <select
+                                id="role"
+                                value={selectedRole}
+                                onChange={(e) => setSelectedRole(e.target.value)}
+                                disabled={loading}
+                                className="w-full appearance-none bg-[#f1f5f9] border border-transparent focus:border-slate-200 focus:bg-white text-slate-800 text-sm rounded-lg px-4 py-3 pr-10 transition-all outline-hidden"
+                            >
+                                <option value="EMPLOYEE">Employee</option>
+                                <option value="DEPT_HEAD">Department Head</option>
+                                <option value="LOC_HEAD">Location Head</option>
+                                <option value="SUPER_ADMIN">Super Admin</option>
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500">
+                                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.23 8.29a.75.75 0 01.02-1.08z" clipRule="evenodd" />
+                                </svg>
+                            </div>
+                        </div>
                     </div>
 
                     <button

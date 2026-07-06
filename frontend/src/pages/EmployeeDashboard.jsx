@@ -1,10 +1,8 @@
 import TenureTimeline from "../components/employee/TenureTimeline";
-import SectionCard from "../components/employee/SectionCard";
-import { getEmployeeId, getEmployeeName } from "../utils/auth";
+import { getEmployeeName } from "../utils/auth";
 
 export default function EmployeeDashboard() {
     const employeeName = getEmployeeName() || "Employee";
-    const employeeId = getEmployeeId() || "N/A";
 
     return (
         <div className="space-y-6">

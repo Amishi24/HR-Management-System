@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
 import SectionCard from "./SectionCard";
@@ -21,15 +21,7 @@ export default function DependentsCard({ onDependentsChange }) {
     // Track IDs of elements targeted for deletion on the client-side
     const [deletedIds, setDeletedIds] = useState([]);
 
-    useEffect(() => {
-        fetchDependents();
-    }, []);
-
-    useEffect(() => {
-        onDependentsChange?.(dependents);
-    }, [dependents]);
-
-    async function fetchDependents() {
+    const fetchDependents = useCallback(async () => {
         try {
             setLoading(true);
             const res = await getDependents();
@@ -43,7 +35,15 @@ export default function DependentsCard({ onDependentsChange }) {
         } finally {
             setLoading(false);
         }
-    }
+    }, []);
+
+    useEffect(() => {
+        fetchDependents();
+    }, [fetchDependents]);
+
+    useEffect(() => {
+        onDependentsChange?.(dependents);
+    }, [dependents, onDependentsChange]);
 
     function handleAdd() {
         const newDependent = {

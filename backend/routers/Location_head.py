@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func
 from typing import List
 
+from fastapi import Header
 from database import get_session 
 from models import Department, Discipline, Employee, EmployeeRole, Positions, Location, Role, RotationPolicy, policy_scope, DepartmentDisciplineCapacity
 from schemas import AppealDecisionPayload, DepartmentLookupResponse, DepartmentTransferResponse, DetailedEmployeeResponse, DisciplineLookupResponse, ExemptionContextResponse, LightTeamEmployeeResponse, LocationDetailsResponse, PositionCreateRequest, PositionDetailsResponse, PositionUpdateRequest, RotationPolicyCreateUpdate, RotationPolicyResponse, TransferAlertResponse, TransferInitiatePayload, TransferReviewPayload, UpdateLocationRequirementsRequest
@@ -10,15 +11,15 @@ from services.transfer_service import TransferService
 
 router = APIRouter()
 
-def get_user_id() -> int:
-    return 10002480
 
-def get_current_location_record(db: Session) -> Location:
-    user_id = get_user_id()
+def get_user_id(current_employee_id: int = Header(..., alias="employee-id")) -> int:
+    return current_employee_id
+
+def get_current_location_record(db: Session, current_user_id: int = Depends(get_user_id)) -> Location:
     subquery = (
         select(Positions.location_id)
         .join(Employee, Employee.current_position_id == Positions.id)
-        .where(Employee.id == user_id)
+        .where(Employee.id == current_user_id)
         .scalar_subquery()
     )
     location = db.execute(select(Location).where(Location.id == subquery)).scalar_one_or_none()
@@ -52,13 +53,20 @@ def get_loc_head_jurisdiction_query(loc_head: Employee, db: Session):
 
 
 @router.get("/my-location", response_model=LocationDetailsResponse)
-def get_my_location(db: Session = Depends(get_session)):
-    return get_current_location_record(db)
+def get_my_location(
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
+    return get_current_location_record(db, current_user_id)
 
 
 @router.patch("/my-location/requirements")
-def update_my_location_requirements(payload: UpdateLocationRequirementsRequest, db: Session = Depends(get_session)):
-    location = get_current_location_record(db)
+def update_my_location_requirements(
+    payload: UpdateLocationRequirementsRequest,
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
+    location = get_current_location_record(db, current_user_id)
     
     update_data = payload.model_dump(exclude_unset=True)
     if not update_data:
@@ -75,12 +83,15 @@ def update_my_location_requirements(payload: UpdateLocationRequirementsRequest, 
 
 
 @router.get("/my-location/positions", response_model=List[PositionDetailsResponse])
-def get_my_location_positions(db: Session = Depends(get_session)):
+def get_my_location_positions(
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
     """
     Returns all positions under the logged-in location head's location.
     """
     
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
 
     stmt = (
         select(
@@ -173,8 +184,12 @@ def validate_position_capacity(
 
 
 @router.post("/my-location/positions", status_code=status.HTTP_201_CREATED)
-def create_position(payload: PositionCreateRequest, db: Session = Depends(get_session)):
-    location = get_current_location_record(db)
+def create_position(
+    payload: PositionCreateRequest,
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
+    location = get_current_location_record(db, current_user_id)
 
     validate_department_and_discipline(db, payload.department_id, payload.discipline_id)
 
@@ -194,8 +209,13 @@ def create_position(payload: PositionCreateRequest, db: Session = Depends(get_se
 
 
 @router.patch("/my-location/positions/{position_id}")
-def update_position(position_id: int, payload: PositionUpdateRequest, db: Session = Depends(get_session)):
-    location = get_current_location_record(db)
+def update_position(
+    position_id: int,
+    payload: PositionUpdateRequest,
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
+    location = get_current_location_record(db, current_user_id)
 
     stmt = select(Positions).where(Positions.id == position_id, Positions.location_id == location.id)
     position = db.execute(stmt).scalar_one_or_none()
@@ -223,11 +243,15 @@ def update_position(position_id: int, payload: PositionUpdateRequest, db: Sessio
 
 
 @router.delete("/my-location/positions/{position_id}")
-def delete_position(position_id: int, db: Session = Depends(get_session)):
+def delete_position(
+    position_id: int,
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
     """
     Deletes a position, ensuring it belongs to the current location head.
     """
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
 
     stmt = select(Positions).where(Positions.id == position_id, Positions.location_id == location.id)
     position = db.execute(stmt).scalar_one_or_none()
@@ -257,11 +281,14 @@ def get_all_disciplines(db: Session = Depends(get_session)):
 # ==========================================
 
 @router.get("/my-location/rotation-policies", response_model=List[RotationPolicyResponse])
-def get_my_location_policies(db: Session = Depends(get_session)):
+def get_my_location_policies(
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+):
     """
     Retrieves all rotation policies defined for the current Location Head's site assignment.
     """
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
     
     stmt = (
         select(RotationPolicy)
@@ -275,13 +302,14 @@ def get_my_location_policies(db: Session = Depends(get_session)):
 @router.post("/my-location/rotation-policy", response_model=RotationPolicyResponse, status_code=status.HTTP_201_CREATED)
 def create_location_policy(
     payload: RotationPolicyCreateUpdate,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
 ):
     """
     Creates a new Local Rotation Policy. Scope Type is automatically assigned to 'LOCAL'
     and Scope ID defaults to the current Location Head's physical assignment location.
     """
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
     
     # Payload configuration mapped directly to DB object
     new_policy = RotationPolicy(
@@ -300,13 +328,14 @@ def create_location_policy(
 def update_location_policy(
     policy_id: int,
     payload: RotationPolicyCreateUpdate,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
 ):
     """
     Modifies the rule configurations of an existing local site assignment rotation policy.
     Validates structural jurisdiction boundaries before mutation.
     """
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
     
     policy = db.get(RotationPolicy, policy_id)
     if not policy:
@@ -328,12 +357,13 @@ def update_location_policy(
 @router.delete("/my-location/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_location_policy(
     policy_id: int,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
 ):
     """
     Removes a rotation policy from the database if it falls under the manager's jurisdiction.
     """
-    location = get_current_location_record(db)
+    location = get_current_location_record(db, current_user_id)
     
     policy = db.get(RotationPolicy, policy_id)
     if not policy:
@@ -355,13 +385,14 @@ def delete_location_policy(
 # ==========================================
 
 # Simple dependency placeholder for checking the security role of your hardcoded Location Head
-def get_current_loc_head(db: Session = Depends(get_session)) -> Employee:
-    user_id = get_user_id()
-    
+def get_current_loc_head(
+    db: Session = Depends(get_session),
+    current_user_id: int = Depends(get_user_id),
+) -> Employee:
     employee = db.query(Employee).options(
         joinedload(Employee.employee_roles).joinedload(EmployeeRole.role),
         joinedload(Employee.current_position)
-    ).filter(Employee.id == user_id).first()
+    ).filter(Employee.id == current_user_id).first()
 
     if not employee:
         raise HTTPException(status_code=404, detail="Employee not found.")

@@ -4,7 +4,7 @@ from sqlalchemy import select, literal, func
 from datetime import date, timedelta
 from typing import List, Optional
 from database import get_session
-# Note: Added EmployeeRole and Role to the imports
+
 from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role, EmployeeTenureCompletionView, Medical, Dependent, Education, Department, DepartmentDisciplineCapacity, Discipline, Assignment
 from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferAlertResponse, TransferInitiatePayload,
                      SubDepartmentResponse,
@@ -15,9 +15,10 @@ from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployee
                      CapacityDashboardResponse,
                      AssignmentCreatePayload,
                     )
+from fastapi import Header
 
-def get_user_id() -> int:
-    return 10002589
+def get_user_id(current_employee_id: int = Header(..., alias="employee-id")) -> int:
+    return current_employee_id
 
 router = APIRouter()
 

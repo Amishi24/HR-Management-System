@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, LayoutDashboard, UserCircle2, SendToBack, LogOut, ShieldCheck } from "lucide-react";
+import { Building2, LayoutDashboard, UserCircle2, SendToBack, LogOut, ShieldCheck, MapPinned } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
 const navigationByRole = {
@@ -20,11 +20,48 @@ const navigationByRole = {
             icon: SendToBack,
         },
     ],
-    ADMIN: [
+    DEPT_HEAD: [
         {
             to: "/employee/dashboard",
-            label: "Admin Dashboard",
+            label: "Employee Dashboard",
+            icon: LayoutDashboard,
+        },
+        {
+            to: "/dept-head/dashboard",
+            label: "Department Head Workspace",
             icon: ShieldCheck,
+        },
+        {
+            to: "/employee/profile",
+            label: "Profile",
+            icon: UserCircle2,
+        },
+        {
+            to: "/employee/transfers",
+            label: "Transfer Requests",
+            icon: SendToBack,
+        },
+    ],
+    LOC_HEAD: [
+        {
+            to: "/employee/dashboard",
+            label: "Employee Dashboard",
+            icon: LayoutDashboard,
+        },
+        {
+            to: "/loc-head/dashboard",
+            label: "Location Head Workspace",
+            icon: MapPinned,
+        },
+        {
+            to: "/employee/profile",
+            label: "Profile",
+            icon: UserCircle2,
+        },
+        {
+            to: "/employee/transfers",
+            label: "Transfer Requests",
+            icon: SendToBack,
         },
     ],
 };
