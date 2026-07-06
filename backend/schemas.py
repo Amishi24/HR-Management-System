@@ -300,9 +300,15 @@ class RotationPolicyCreateUpdate(BaseModel):
     scope_id: Optional[int] = None
     rules_config: Optional[RulesConfigPayload] = None
 
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_casing(cls, data: Any) -> Any:
+        if isinstance(data, dict) and 'scope_type' in data and isinstance(data['scope_type'], str):
+            data['scope_type'] = data['scope_type'].capitalize()
+        return data
+
     @model_validator(mode='after')
     def check_scope_id(self):
-        # We only strictly enforce this if they are actively trying to change it to LOCAL
         if self.scope_type == policy_scope.LOCAL and self.scope_id is None:
             raise ValueError("scope_id is required for Local scope_type")
         return self
