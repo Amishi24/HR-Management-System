@@ -6,6 +6,7 @@ from typing import List, Optional
 from database import get_session
 
 from models import Employee, Positions, Department, TransferRequest, TenureRecord, transfer_status, EmployeeRole, Role, EmployeeTenureCompletionView, Medical, Dependent, Education, Department, DepartmentDisciplineCapacity, Discipline, Assignment
+from services.transfer_service import TransferService
 from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployeeResponse, TransferResponse, TransferAlertResponse, TransferInitiatePayload,
                      SubDepartmentResponse,
                      DepartmentTransferResponse,
@@ -323,42 +324,8 @@ def get_mandatory_transfer_alerts(
     db : Session = Depends(get_session),
     dept_head : Employee = Depends(get_current_dept_head)
 ):
-    base_query = get_team_jurisdiction_query(dept_head, db)
-
-    nine_years_ago = date.today() - timedelta(days=365*9)
-    ten_years_ago = date.today() - timedelta(days=365*10)
-
-    mandatory_transfer_emp = base_query.options(
-        joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.location),
-        joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.department)
-    ).join(TenureRecord).filter(
-        TenureRecord.end_date == None,
-        TenureRecord.start_date >= nine_years_ago,
-        TenureRecord.start_date <= ten_years_ago
-    ).all()
-
-    alerts = []
-    for emp in mandatory_transfer_emp:
-        active_tenures = next((t for t in  emp.tenure_records if t.end_date is None), None)
-
-        if active_tenures:
-            days_served = (date.today() - active_tenures.start_date).days
-            years_served = round(days_served / 365.25, 1)
-
-            alerts.append(
-                {
-                    "employee_id" : emp.id,
-                    "employee_name" : emp.name,
-                    "current_state" : active_tenures.position.location.state if active_tenures.position else "Unknown",
-                    "current_city" : active_tenures.position.location.city if active_tenures.position else "Unknown",
-                    "department_name": active_tenures.position.department.name if active_tenures.position else "Unknown",
-                    "tenure_start_date" : active_tenures.start_date,
-                    "years_served": years_served,
-                    "alert_type": "MANDATORY_9_YEAR_TRANSFER"
-                }
-            )
-
-    return alerts
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db).with_entities(Employee.id)
+    return TransferService.fetch_mandatory_alerts(db, allowed_employee_ids_query=jurisdiction_query)
 
 
 @router.post("/transfers/initiate", status_code=status.HTTP_201_CREATED)
@@ -367,41 +334,15 @@ def initiate_employee_transfer(
     db: Session = Depends(get_session),
     dept_head: Employee = Depends(get_current_dept_head)
 ):
-    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
-    target_employee = jurisdiction_query.options(
-        joinedload(Employee.tenure_records)
-    ).filter(Employee.id == payload.employee_id).first()
-
-    if not target_employee:
-        raise HTTPException(status_code=403, detail="Employee not found in your jurisdiction.")
-
-    active_tenure = next((t for t in target_employee.tenure_records if t.end_date is None), None)
-    if not active_tenure:
-        raise HTTPException(status_code=400, detail="Employee does not have an active tenure record.")
-
-    three_years_ago = date.today() - timedelta(days=1095) 
-    if active_tenure.start_date > three_years_ago:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Transfer blocked. Minimum 3-year lock-in rule not met."
-        )
-
-    new_transfer = TransferRequest(
-        employee_id=payload.employee_id,
-        # FIX: Ensure we use the string value since the DB column expects a String
-        status=transfer_status.PROPOSED.name, 
-        approved_by=dept_head.id,
-        audit_notes=payload.reason,
-        location_preferences=[] 
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db).with_entities(Employee.id)
+    return TransferService.initiate_transfer(
+        db,
+        initiator_id=dept_head.id,
+        target_employee_id=payload.employee_id,
+        reason=payload.reason,
+        allowed_employee_ids_query=jurisdiction_query
     )
-    
-    db.add(new_transfer)
-    db.commit()
-    
-    return {
-        "message": "Transfer initiated. Employee has been flagged to provide preferences.", 
-        "transfer_id": new_transfer.id
-    }
+
 
 
 @router.get("/transfers", response_model=list[DepartmentTransferResponse])

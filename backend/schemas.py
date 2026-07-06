@@ -1,6 +1,7 @@
 from datetime import date, datetime
+from pickle import GLOBAL
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from models import policy_scope
 
@@ -278,14 +279,31 @@ class LevelGatingRules(BaseModel):
     lateral_only: List[int] = Field(default_factory=list)
     promotions_allowed: List[int] = Field(default_factory=list)
 
+class TenureRules(BaseModel):
+    min_tenure_years: int = Field(..., ge=1)
+    max_tenure_years: int = Field(..., ge=1)
+
 class RulesConfigPayload(BaseModel):
-    level_gating: LevelGatingRules
+    level_gating: Optional[LevelGatingRules] = None
+    tenure_rules: Optional[TenureRules] = None
 
 class RotationPolicyResponse(BaseModel):
     id: int
+    scope_type: str
+    scope_id: Optional[int] = None
     rules_config: Dict
 
     model_config = ConfigDict(from_attributes=True)
 
 class RotationPolicyCreateUpdate(BaseModel):
-    rules_config: RulesConfigPayload
+    scope_type: Optional[policy_scope] = GLOBAL
+    scope_id: Optional[int] = None
+    rules_config: Optional[RulesConfigPayload] = None
+
+    @model_validator(mode='after')
+    def check_scope_id(self):
+        # We only strictly enforce this if they are actively trying to change it to LOCAL
+        if self.scope_type == policy_scope.LOCAL and self.scope_id is None:
+            raise ValueError("scope_id is required for Local scope_type")
+        return self
+    
