@@ -6,17 +6,17 @@ const roleCopy = {
         title: "Department Head Workspace",
         description: "Choose whether to open your department workspace or review your personal profile.",
         primaryLabel: "Open Department Workspace",
-        primaryRoute: "/dept-head/dashboard",
-        secondaryLabel: "Open My Profile",
-        secondaryRoute: "/employee/profile",
+        primaryRoute: "/dept-head/manager",
+        secondaryLabel: "Open My Personal Dashboard",
+        secondaryRoute: "/dept-head/personal",
     },
     LOC_HEAD: {
         title: "Location Head Workspace",
         description: "Choose whether to manage your location operations or view your personal profile.",
         primaryLabel: "Open Location Workspace",
-        primaryRoute: "/loc-head/dashboard",
-        secondaryLabel: "Open My Profile",
-        secondaryRoute: "/employee/profile",
+        primaryRoute: "/loc-head/manager",
+        secondaryLabel: "Open My Personal Dashboard",
+        secondaryRoute: "/loc-head/personal",
     },
 };
 

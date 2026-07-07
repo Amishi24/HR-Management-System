@@ -31,15 +31,19 @@ function App() {
 
             <Route element={<ProtectedRoute allowedRoles={["DEPT_HEAD", "dept_head"]} />}>
                 <Route path="/dept-head" element={<EmployeeLayout />}>
-                    <Route index element={<Navigate to="/dept-head/dashboard" replace />} />
-                    <Route path="dashboard" element={<DepartmentHeadDashboardPage />} />
+                    <Route index element={<Navigate to="/dept-head/personal" replace />} />
+                    <Route path="personal" element={<DepartmentHeadDashboardPage />} />
+                    <Route path="manager" element={<DepartmentHeadDashboardPage />} />
+                    <Route path="dashboard" element={<Navigate to="/dept-head/personal" replace />} />
                 </Route>
             </Route>
 
             <Route element={<ProtectedRoute allowedRoles={["LOC_HEAD", "loc_head"]} />}>
                 <Route path="/loc-head" element={<EmployeeLayout />}>
-                    <Route index element={<Navigate to="/loc-head/dashboard" replace />} />
-                    <Route path="dashboard" element={<LocationHeadDashboardPage />} />
+                    <Route index element={<Navigate to="/loc-head/personal" replace />} />
+                    <Route path="personal" element={<LocationHeadDashboardPage />} />
+                    <Route path="manager" element={<LocationHeadDashboardPage />} />
+                    <Route path="dashboard" element={<Navigate to="/loc-head/personal" replace />} />
                 </Route>
             </Route>
         </Routes>
