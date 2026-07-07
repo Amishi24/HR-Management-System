@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { isLoggedIn } from "../utils/auth";
-import Sidebar from "../components/Sidebar";
+import SideBar from "../components/SideBar";
 import RoleDashboardSwitcher from "../components/shared/RoleDashboardSwitcher";
 import { getRole } from "../utils/auth";
 
 export default function EmployeeLayout() {
     const location = useLocation();
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const [isSideBarCollapsed, setIsSideBarCollapsed] = useState(false);
     const role = (getRole() || "EMPLOYEE").toUpperCase();
 
     if (!isLoggedIn()) {
@@ -31,12 +31,12 @@ export default function EmployeeLayout() {
 
     return (
         <div className="flex min-h-screen w-full bg-[#f8fafc]">
-            <div className={`hidden lg:block h-screen sticky top-0 border-r border-slate-200 bg-white transition-all duration-200 ${isSidebarCollapsed ? "w-20" : "w-72"}`}>
-                <Sidebar isCollapsed={isSidebarCollapsed} onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)} />
+            <div className={`hidden lg:block h-screen sticky top-0 border-r border-slate-200 bg-white transition-all duration-200 ${isSideBarCollapsed ? "w-20" : "w-72"}`}>
+                <SideBar isCollapsed={isSideBarCollapsed} onToggleCollapse={() => setIsSideBarCollapsed((prev) => !prev)} />
             </div>
 
             <div className="block lg:hidden w-full border-b border-slate-200 bg-white">
-                <Sidebar isCollapsed={false} onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)} />
+                <SideBar isCollapsed={false} onToggleCollapse={() => setIsSideBarCollapsed((prev) => !prev)} />
             </div>
 
             <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
