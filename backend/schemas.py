@@ -81,12 +81,13 @@ class DependentUpdate(BaseModel):
     relation: Optional[str] = None
 
 class EducationBase(BaseModel):
-    curr_class: Optional[int] = None
+    curr_class: Optional[int] = Field(None, ge=1, le=12)
     academic_year: Optional[str] = None
 
 class ChildrenResponse(EducationBase):
     dependent_id: int
     name: str
+    has_education: bool
     model_config = ConfigDict(from_attributes=True)
 
 

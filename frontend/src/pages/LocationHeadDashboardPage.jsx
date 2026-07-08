@@ -3,17 +3,28 @@ import PersonalDashboardView from "../components/shared/PersonalDashboardView";
 import LocationHeadManagerDashboard from "../components/manager/LocationHeadManagerDashboard";
 
 export default function LocationHeadDashboardPage() {
-    const location = useLocation();
-    const activeView = location.pathname.includes("/manager") ? "manager" : "personal";
+  const location = useLocation();
+  const activeView = location.pathname.includes("/manager")
+    ? "manager"
+    : "personal";
 
-    return (
-        <div className="space-y-6">
-            <div>
-                <h1 className="text-3xl font-bold text-slate-800">Location Head Workspace</h1>
-                <p className="text-slate-500 text-sm mt-1">Switch between your personal dashboard and the location management workspace.</p>
-            </div>
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold text-slate-800">
+          Location Head Workspace
+        </h1>
+        <p className="text-slate-500 text-sm mt-1">
+          Switch between your personal dashboard and the location management
+          workspace.
+        </p>
+      </div>
 
-            {activeView === "manager" ? <LocationHeadManagerDashboard /> : <PersonalDashboardView />}
-        </div>
-    );
+      {activeView === "manager" ? (
+        <LocationHeadManagerDashboard />
+      ) : (
+        <PersonalDashboardView />
+      )}
+    </div>
+  );
 }
