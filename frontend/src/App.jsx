@@ -37,7 +37,28 @@ function App() {
           <Route path="personal" element={<EmployeeDashboard />} />
           <Route path="personal/profile" element={<EmployeeProfilePage />} />
           <Route path="personal/transfers" element={<TransferRequestsPage />} />
-          <Route path="manager" element={<ManagerDashboardPage />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/dept-head/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/team-management"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/transfer-management"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/employee-directory"
+            element={<ManagerDashboardPage />}
+          />
           <Route
             path="dashboard"
             element={<Navigate to="/dept-head/personal" replace />}
@@ -53,7 +74,24 @@ function App() {
           <Route path="personal" element={<EmployeeDashboard />} />
           <Route path="personal/profile" element={<EmployeeProfilePage />} />
           <Route path="personal/transfers" element={<TransferRequestsPage />} />
-          <Route path="manager" element={<ManagerDashboardPage />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/loc-head/manager/manage-location" replace />
+            }
+          />
+          <Route
+            path="manager/manage-location"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/manage-positions"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/transfer-workflow"
+            element={<ManagerDashboardPage />}
+          />
           <Route
             path="dashboard"
             element={<Navigate to="/loc-head/personal" replace />}

@@ -59,15 +59,59 @@ const getNavigationItems = (role, view) => {
     if (!config.managerBasePath) {
       return [];
     }
+    if (role === "LOC_HEAD") {
+      return [
+        {
+          key: "manage-location",
+          label: "Manage Location",
+          icon: MapPinned,
+          to: "/loc-head/manager/manage-location",
+        },
+        {
+          key: "manage-positions",
+          label: "Manage Positions",
+          icon: Building2,
+          to: "/loc-head/manager/manage-positions",
+        },
+        {
+          key: "transfer-workflow",
+          label: "Transfer Workflow",
+          icon: SendToBack,
+          to: "/loc-head/manager/transfer-workflow",
+        },
+      ];
+    }
 
-    return [
-      {
-        key: "manager",
-        label: config.managerLabel,
-        icon: config.managerIcon,
-        to: config.managerBasePath,
-      },
-    ];
+    if (role === "DEPT_HEAD") {
+      return [
+        {
+          key: "dashboard",
+          label: "Dashboard",
+          icon: LayoutDashboard,
+          to: "/dept-head/manager/dashboard",
+        },
+        {
+          key: "team-management",
+          label: "Team Management",
+          icon: Building2,
+          to: "/dept-head/manager/team-management",
+        },
+        {
+          key: "employee-directory",
+          label: "Employee Directory",
+          icon: UserCircle2,
+          to: "/dept-head/manager/employee-directory",
+        },
+        {
+          key: "transfer-management",
+          label: "Transfer Management",
+          icon: SendToBack,
+          to: "/dept-head/manager/transfer-management",
+        },
+      ];
+    }
+
+    return [];
   }
 
   return personalNavItems.map((item) => ({

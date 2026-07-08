@@ -1,5 +1,5 @@
 import { Trash2 } from "lucide-react";
-import SectionCard from "../employee/SectionCard";
+import SectionCard from "../common/SectionCard";
 
 export default function LocationRotationPolicies({ policies, policyForm, onPolicyFormChange, onCreatePolicy, onDeletePolicy }) {
     return (

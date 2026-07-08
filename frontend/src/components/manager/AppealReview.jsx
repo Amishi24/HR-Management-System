@@ -1,4 +1,4 @@
-import SectionCard from "../employee/SectionCard";
+import SectionCard from "../common/SectionCard";
 
 export default function AppealReview({ appealContext, onAppealDecision, reviewNotes, onReviewNotesChange, submitting }) {
     if (!appealContext) return null;

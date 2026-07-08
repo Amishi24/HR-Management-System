@@ -1,4 +1,4 @@
-import SectionCard from "../employee/SectionCard";
+import SectionCard from "../common/SectionCard";
 
 export default function LocTeamRoster({ team }) {
     return (

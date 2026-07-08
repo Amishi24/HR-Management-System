@@ -1,4 +1,4 @@
-import SectionCard from "./SectionCard";
+import SectionCard from "../common/SectionCard";
 
 export default function DeptCapacityDashboard({ capacity }) {
     return (

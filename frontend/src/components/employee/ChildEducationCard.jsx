@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 
-import SectionCard from "./SectionCard";
+import SectionCard from "../common/SectionCard";
 
 import {
   getChildEducation,
