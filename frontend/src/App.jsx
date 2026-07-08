@@ -6,9 +6,7 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import EmployeeProfilePage from "./pages/EmployeeProfilePage";
 import TransferRequestsPage from "./pages/TransferRequestsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
-import DepartmentHeadDashboardPage from "./pages/DepartmentHeadDashboardPage";
-import LocationHeadDashboardPage from "./pages/LocationHeadDashboardPage";
-import RoleLandingPage from "./pages/RoleLandingPage";
+import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 
 function App() {
   return (
@@ -29,16 +27,6 @@ function App() {
       </Route>
 
       <Route
-        element={
-          <ProtectedRoute
-            allowedRoles={["DEPT_HEAD", "LOC_HEAD", "dept_head", "loc_head"]}
-          />
-        }
-      >
-        <Route path="/role-landing" element={<RoleLandingPage />} />
-      </Route>
-
-      <Route
         element={<ProtectedRoute allowedRoles={["DEPT_HEAD", "dept_head"]} />}
       >
         <Route path="/dept-head" element={<EmployeeLayout />}>
@@ -46,8 +34,10 @@ function App() {
             index
             element={<Navigate to="/dept-head/personal" replace />}
           />
-          <Route path="personal" element={<DepartmentHeadDashboardPage />} />
-          <Route path="manager" element={<DepartmentHeadDashboardPage />} />
+          <Route path="personal" element={<EmployeeDashboard />} />
+          <Route path="personal/profile" element={<EmployeeProfilePage />} />
+          <Route path="personal/transfers" element={<TransferRequestsPage />} />
+          <Route path="manager" element={<ManagerDashboardPage />} />
           <Route
             path="dashboard"
             element={<Navigate to="/dept-head/personal" replace />}
@@ -60,8 +50,10 @@ function App() {
       >
         <Route path="/loc-head" element={<EmployeeLayout />}>
           <Route index element={<Navigate to="/loc-head/personal" replace />} />
-          <Route path="personal" element={<LocationHeadDashboardPage />} />
-          <Route path="manager" element={<LocationHeadDashboardPage />} />
+          <Route path="personal" element={<EmployeeDashboard />} />
+          <Route path="personal/profile" element={<EmployeeProfilePage />} />
+          <Route path="personal/transfers" element={<TransferRequestsPage />} />
+          <Route path="manager" element={<ManagerDashboardPage />} />
           <Route
             path="dashboard"
             element={<Navigate to="/loc-head/personal" replace />}

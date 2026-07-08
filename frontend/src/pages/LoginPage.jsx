@@ -25,8 +25,10 @@ export default function LoginPage() {
         role: userRole,
       });
 
-      if (userRole !== "EMPLOYEE") {
-        navigate("/role-landing", { replace: true });
+      if (userRole === "DEPT_HEAD") {
+        navigate("/dept-head/manager", { replace: true });
+      } else if (userRole === "LOC_HEAD") {
+        navigate("/loc-head/manager", { replace: true });
       } else {
         navigate("/employee/dashboard", { replace: true });
       }
