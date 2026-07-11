@@ -9,6 +9,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import DepartmentHeadDashboardPage from "./pages/DepartmentHeadDashboardPage";
 import LocationHeadDashboardPage from "./pages/LocationHeadDashboardPage";
 import RoleLandingPage from "./pages/RoleLandingPage";
+import PolicyPage from "./pages/PolicyPage";
 
 function App() {
     return (
@@ -41,6 +42,10 @@ function App() {
                     <Route index element={<Navigate to="/loc-head/dashboard" replace />} />
                     <Route path="dashboard" element={<LocationHeadDashboardPage />} />
                 </Route>
+            </Route>
+            
+            <Route element={<ProtectedRoute allowedRoles={["SUPER_ADMIN"]} />}>
+                <Route path="/policy" element={<PolicyPage />} />
             </Route>
         </Routes>
     );

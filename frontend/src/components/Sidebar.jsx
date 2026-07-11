@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { Building2, LayoutDashboard, UserCircle2, SendToBack, LogOut, ShieldCheck, MapPinned } from "lucide-react";
+import { Building2, LayoutDashboard, UserCircle2, SendToBack, LogOut, ShieldCheck, MapPinned, FileCog } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
 const navigationByRole = {
@@ -62,6 +62,13 @@ const navigationByRole = {
             to: "/employee/transfers",
             label: "Transfer Requests",
             icon: SendToBack,
+        },
+    ],
+    SUPER_ADMIN: [
+        {
+            to: "/policy",
+            label: "Policy Management",
+            icon: FileCog,
         },
     ],
 };

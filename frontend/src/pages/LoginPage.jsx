@@ -16,11 +16,6 @@ export default function LoginPage() {
         e.preventDefault();
         setError(null);
 
-        if (selectedRole === "SUPER_ADMIN") {
-            setError("Coming soon");
-            return;
-        }
-
         setLoading(true);
 
         try {
@@ -30,6 +25,7 @@ export default function LoginPage() {
 
             if (claimedRole !== backendRole) {
                 setError(`Selected role does not match the account role.`);
+                setLoading(false);
                 return;
             }
 
@@ -39,7 +35,9 @@ export default function LoginPage() {
                 role: backendRole,
             });
 
-            if (backendRole === "DEPT_HEAD" || backendRole === "LOC_HEAD") {
+            if (backendRole === "SUPER_ADMIN") {
+                navigate("/policy", { replace: true });
+            } else if (backendRole === "DEPT_HEAD" || backendRole === "LOC_HEAD") {
                 navigate("/role-landing", { replace: true });
             } else {
                 navigate("/employee/dashboard", { replace: true });
