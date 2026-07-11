@@ -172,7 +172,8 @@ def get_dependent_education(
                     "dependent_id" : dependent.id,
                     "name" : dependent.full_name,
                     "curr_class" : child_class,
-                    "academic_year" : child_academic_year
+                    "academic_year" : child_academic_year,
+                    "has_education" : dependent.education is not None
                 }
             )
 

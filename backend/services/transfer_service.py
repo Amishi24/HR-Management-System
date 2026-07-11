@@ -16,7 +16,7 @@ class TransferService:
         # Look for a local policy first
         if employee.current_position and employee.current_position.location_id:
             local_policy = db.query(RotationPolicy).filter(
-                RotationPolicy.scope_type == policy_scope.LOCAL,
+                RotationPolicy.scope_type == policy_scope.LOCAL.value,
                 RotationPolicy.scope_id == employee.current_position.location_id
             ).first()
             if local_policy and local_policy.rules_config.get('tenure_rules'):
@@ -24,7 +24,7 @@ class TransferService:
                 return rules
 
         # Fallback to global policy
-        global_policy = db.query(RotationPolicy).filter(RotationPolicy.scope_type == policy_scope.GLOBAL).first()
+        global_policy = db.query(RotationPolicy).filter(RotationPolicy.scope_type == policy_scope.GLOBAL.value).first()
         if global_policy and global_policy.rules_config.get('tenure_rules'):
             rules.update(global_policy.rules_config['tenure_rules'])
 

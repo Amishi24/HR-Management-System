@@ -1,7 +1,6 @@
 from datetime import date, datetime
-from pickle import GLOBAL
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from models import policy_scope
 
@@ -82,12 +81,13 @@ class DependentUpdate(BaseModel):
     relation: Optional[str] = None
 
 class EducationBase(BaseModel):
-    curr_class: Optional[int] = None
+    curr_class: Optional[int] = Field(None, ge=1, le=12)
     academic_year: Optional[str] = None
 
 class ChildrenResponse(EducationBase):
     dependent_id: int
     name: str
+    has_education: bool
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -279,37 +279,14 @@ class LevelGatingRules(BaseModel):
     lateral_only: List[int] = Field(default_factory=list)
     promotions_allowed: List[int] = Field(default_factory=list)
 
-class TenureRules(BaseModel):
-    min_tenure_years: int = Field(..., ge=1)
-    max_tenure_years: int = Field(..., ge=1)
-
 class RulesConfigPayload(BaseModel):
-    level_gating: Optional[LevelGatingRules] = None
-    tenure_rules: Optional[TenureRules] = None
+    level_gating: LevelGatingRules
 
 class RotationPolicyResponse(BaseModel):
     id: int
-    scope_type: str
-    scope_id: Optional[int] = None
     rules_config: Dict
 
     model_config = ConfigDict(from_attributes=True)
 
 class RotationPolicyCreateUpdate(BaseModel):
-    scope_type: Optional[policy_scope] = GLOBAL
-    scope_id: Optional[int] = None
-    rules_config: Optional[RulesConfigPayload] = None
-
-    @model_validator(mode='before')
-    @classmethod
-    def normalize_casing(cls, data: Any) -> Any:
-        if isinstance(data, dict) and 'scope_type' in data and isinstance(data['scope_type'], str):
-            data['scope_type'] = data['scope_type'].capitalize()
-        return data
-
-    @model_validator(mode='after')
-    def check_scope_id(self):
-        if self.scope_type == policy_scope.LOCAL and self.scope_id is None:
-            raise ValueError("scope_id is required for Local scope_type")
-        return self
-    
+    rules_config: RulesConfigPayload
