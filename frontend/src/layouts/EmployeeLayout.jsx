@@ -1,29 +1,75 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { useState } from "react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { isLoggedIn } from "../utils/auth";
 import SideBar from "../components/SideBar";
+import RoleDashboardSwitcher from "../components/shared/RoleDashboardSwitcher";
+import { getRole } from "../utils/auth";
 
 export default function EmployeeLayout() {
-    if (!isLoggedIn()) {
-        return <Navigate to="/login" replace />;
+  const location = useLocation();
+  const [isSideBarCollapsed, setIsSideBarCollapsed] = useState(false);
+  const role = (getRole() || "EMPLOYEE").toUpperCase();
+
+  if (!isLoggedIn()) {
+    return <Navigate to="/login" replace />;
+  }
+
+  const isManagerRole = role === "DEPT_HEAD" || role === "LOC_HEAD";
+  const isManagerRoute =
+    location.pathname.startsWith("/dept-head/manager") ||
+    location.pathname.startsWith("/loc-head/manager");
+  const activeView = isManagerRoute ? "manager" : "personal";
+
+  const handleViewChange = (selectedView) => {
+    if (role === "DEPT_HEAD") {
+      window.location.assign(
+        selectedView === "manager"
+          ? "/dept-head/manager"
+          : "/dept-head/personal",
+      );
+      return;
     }
 
-    return (
-        <div className="flex min-h-screen w-full bg-[#f8fafc]">
-            {/* Sidebar anchored left at a fixed viewport frame */}
-            <div className="hidden lg:block w-72 shrink-0 h-screen sticky top-0 bg-white border-r border-slate-200">
-                <SideBar />
-            </div>
+    if (role === "LOC_HEAD") {
+      window.location.assign(
+        selectedView === "manager" ? "/loc-head/manager" : "/loc-head/personal",
+      );
+    }
+  };
 
-            {/* Mobile Sidebar display handler fallback container */}
-            <div className="block lg:hidden w-full border-b border-slate-200 bg-white">
-                <SideBar />
-            </div>
+  return (
+    <div className="flex min-h-screen w-full bg-[#f8fafc]">
+      <div
+        className={`hidden lg:block h-screen sticky top-0 border-r border-slate-200 bg-white transition-all duration-200 ${isSideBarCollapsed ? "w-20" : "w-72"}`}
+      >
+        <SideBar
+          isCollapsed={isSideBarCollapsed}
+          onToggleCollapse={() => setIsSideBarCollapsed((prev) => !prev)}
+        />
+      </div>
 
-            {/* Main Content Area view panel */}
-            <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
-                <Outlet />
-            </main>
-        </div>
-        
-    );
+      <div className="block lg:hidden w-full border-b border-slate-200 bg-white">
+        <SideBar
+          isCollapsed={false}
+          onToggleCollapse={() => setIsSideBarCollapsed((prev) => !prev)}
+        />
+      </div>
+
+      <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
+        {isManagerRole && (
+          <div className="mb-6 flex justify-end">
+            <RoleDashboardSwitcher
+              activeView={activeView}
+              onChange={handleViewChange}
+              personalLabel="My Personal Dashboard"
+              managerLabel={
+                role === "LOC_HEAD" ? "Location Dashboard" : "Team Dashboard"
+              }
+            />
+          </div>
+        )}
+        <Outlet />
+      </main>
+    </div>
+  );
 }

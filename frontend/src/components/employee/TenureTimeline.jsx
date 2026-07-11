@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import SectionCard from "./SectionCard";
+import SectionCard from "../common/SectionCard";
 import { getTenures, getTenureDetails } from "../../api/employeeApi";
 
 export default function TenureTimeline() {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getProfile } from "../../api/employeeApi";
-import SectionCard from "./SectionCard";
+import SectionCard from "../common/SectionCard";
 
 export default function IdentityCard() {
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Plus, Trash2, X } from "lucide-react";
-import SectionCard from "./SectionCard";
+import SectionCard from "../common/SectionCard";
 import { 
     getTransferRequests, 
     getLocations, 
