@@ -1,4 +1,5 @@
-import { Plus, XCircle } from "lucide-react";
+import { useState } from "react";
+import { Plus, XCircle, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
 import SectionCard from "../common/SectionCard";
 
 export default function EmployeeDetail({
@@ -7,7 +8,12 @@ export default function EmployeeDetail({
   onAssignmentDraftChange,
   onCreateAssignment,
   onDeleteAssignment,
+  onInitiateTransfer,
 }) {
+  const [showModal, setShowModal] = useState(false);
+  const [transferReason, setTransferReason] = useState("Initiated by your department head.");
+  const [submittingTransfer, setSubmittingTransfer] = useState(false);
+  const [status, setStatus] = useState(null); // { type: 'success' | 'error', text: '' }
   if (!employee) return null;
 
   if (employee.error) {
@@ -23,6 +29,25 @@ export default function EmployeeDetail({
     );
   }
 
+  const handleInitiateSubmit = async (e) => {
+    e.preventDefault();
+    setSubmittingTransfer(true);
+    setStatus(null);
+    const result = await onInitiateTransfer(employee.id, transferReason);
+    if (result.success) {
+      setStatus({ type: "success", text: result.message || "successfully initiated" });
+      setTimeout(() => {
+        setShowModal(false);
+        setStatus(null);
+      }, 2000);
+    } else {
+      setStatus({ type: "error", text: result.message || "couldnt initiate transfer" });
+    }
+    setSubmittingTransfer(false);
+  };
+
+  const hasActiveTransfer = employee.active_transfers && employee.active_transfers.length > 0;
+
   return (
     <SectionCard
       title="Employee Detail"
@@ -30,15 +55,35 @@ export default function EmployeeDetail({
     >
       <div className="space-y-6">
         {/* Profile Header */}
-        <div className="flex items-center gap-4 border-b border-slate-105 pb-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 font-bold text-lg border border-blue-100 shadow-2xs">
-            {employee.name?.charAt(0).toUpperCase()}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 font-bold text-lg border border-blue-100 shadow-2xs">
+              {employee.name?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-slate-800">{employee.name}</h3>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                {employee.discipline_name || "Discipline not assigned"}
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-slate-800">{employee.name}</h3>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              {employee.discipline_name || "Discipline not assigned"}
-            </p>
+          <div className="sm:self-center">
+            {hasActiveTransfer ? (
+              <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-3 py-1.5 text-xs text-amber-700 font-bold">
+                Transfer Pending
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  setTransferReason("Initiated by your department head.");
+                  setStatus(null);
+                  setShowModal(true);
+                }}
+                className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-600 hover:text-white transition-all shadow-2xs hover:shadow-sm cursor-pointer"
+              >
+                Initiate Transfer
+              </button>
+            )}
           </div>
         </div>
 
@@ -203,6 +248,86 @@ export default function EmployeeDetail({
           )}
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+              <h3 className="text-base font-bold text-slate-800">Initiate Transfer</h3>
+              <button
+                onClick={() => {
+                  setShowModal(false);
+                  setStatus(null);
+                }}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-colors"
+              >
+                <XCircle size={20} />
+              </button>
+            </div>
+
+            {status && (
+              <div
+                className={`mb-4 flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold ${
+                  status.type === "success"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-rose-200 bg-rose-50 text-rose-700"
+                }`}
+              >
+                {status.type === "success" ? <CheckCircle size={16} className="shrink-0 mt-0.5" /> : <AlertCircle size={16} className="shrink-0 mt-0.5" />}
+                <span>{status.text}</span>
+              </div>
+            )}
+
+            <p className="text-xs text-slate-600 mb-4">
+              Are you sure you want to initiate a transfer request for <strong className="text-slate-800">{employee.name}</strong>?
+              This will flag the employee to select their preferred locations.
+            </p>
+
+            <form onSubmit={handleInitiateSubmit} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Reason for Transfer
+                </label>
+                <textarea
+                  value={transferReason}
+                  onChange={(e) => setTransferReason(e.target.value)}
+                  placeholder="Provide audit notes or reasons for this transfer request..."
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs focus:border-blue-500 focus:bg-white focus:outline-none transition-all resize-none h-24"
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                    setStatus(null);
+                  }}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  disabled={submittingTransfer}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-blue-750 transition-colors flex items-center gap-1.5 disabled:opacity-60 shadow-sm"
+                  disabled={submittingTransfer}
+                >
+                  {submittingTransfer ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span>Initiating...</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Initiate</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </SectionCard>
   );
 }

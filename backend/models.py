@@ -19,8 +19,8 @@ class transfer_status(enum.Enum):
     CANCELLED = "Cancelled"
 
 class policy_scope(enum.Enum):
-    GLOBAL = "Global"
-    LOCAL = "Local"
+    GLOBAL = "GLOBAL"
+    LOCAL = "LOCAL"
 
 class dependent_relation(enum.Enum):
     Spouse = "Spouse"

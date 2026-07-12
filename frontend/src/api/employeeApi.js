@@ -75,3 +75,11 @@ export const deleteTransferRequest = (transferId) => {
 export const getLocations = () => {
     return api.get("/me/locations");
 };
+
+export const appealTransferRequest = (transferId, data) => {
+    return api.patch(`/me/transfers/${transferId}/appeal`, data);
+};
+
+export const updateTransferPreferences = (transferId, data) => {
+    return api.patch(`/me/transfers/${transferId}/preferences`, data);
+};

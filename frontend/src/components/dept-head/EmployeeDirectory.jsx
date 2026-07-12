@@ -5,6 +5,7 @@ import {
   getDeptHeadTeamMember,
   createDeptHeadAssignment,
   deleteDeptHeadAssignment,
+  initiateDeptHeadTransfer,
 } from "../../api/roleApi";
 import EmployeeDetail from "./EmployeeDetail";
 import { Search, User } from "lucide-react";
@@ -117,6 +118,18 @@ export default function EmployeeDirectory() {
     }
   }
 
+  async function handleInitiateTransfer(employeeId, reason) {
+    try {
+      const res = await initiateDeptHeadTransfer({ employee_id: employeeId, reason });
+      await fetchEmployeeDetail(employeeId);
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      console.error(err);
+      const errorMsg = err.response?.data?.detail || "The transfer could not be initiated.";
+      return { success: false, message: errorMsg };
+    }
+  }
+
   const handleAssignmentDraftChange = (key, field, value) =>
     setAssignmentDrafts((prev) => ({
       ...prev,
@@ -205,6 +218,7 @@ export default function EmployeeDirectory() {
               onAssignmentDraftChange={handleAssignmentDraftChange}
               onCreateAssignment={handleCreateAssignment}
               onDeleteAssignment={handleDeleteAssignment}
+              onInitiateTransfer={handleInitiateTransfer}
             />
           ) : (
             <div className="rounded-3xl border border-slate-200 border-dashed bg-slate-50 p-12 text-center text-slate-400 shadow-sm flex flex-col items-center justify-center min-h-[300px]">

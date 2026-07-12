@@ -280,23 +280,34 @@ def get_all_disciplines(db: Session = Depends(get_session)):
 #  ROTATION POLICY UNDER LOC_HEAD
 # ==========================================
 
-@router.get("/my-location/rotation-policies", response_model=List[RotationPolicyResponse])
-def get_my_location_policies(
+@router.get("/my-location/rotation-policy", response_model=RotationPolicyResponse | None)
+def get_my_location_policy(
     db: Session = Depends(get_session),
     current_user_id: int = Depends(get_user_id),
 ):
     """
-    Retrieves all rotation policies defined for the current Location Head's site assignment.
+    Retrieves the local rotation policy for the current Location Head's site assignment.
     """
     location = get_current_location_record(db, current_user_id)
     
-    stmt = (
-        select(RotationPolicy)
-        .where(RotationPolicy.scope_id == location.id)
-        .order_by(RotationPolicy.id.asc())
+    stmt = select(RotationPolicy).where(
+        RotationPolicy.scope_type == policy_scope.LOCAL.value,
+        RotationPolicy.scope_id == location.id,
     )
-    policies = db.execute(stmt).scalars().all()
-    return policies
+    return db.execute(stmt).scalars().first()
+
+
+@router.get("/global-policy", response_model=RotationPolicyResponse)
+def get_global_policy(db: Session = Depends(get_session)):
+    """Retrieves the default global rotation policy."""
+    stmt = select(RotationPolicy).where(
+        RotationPolicy.scope_type == policy_scope.GLOBAL.value,
+        RotationPolicy.scope_id.is_(None),
+    )
+    policy = db.execute(stmt).scalars().first()
+    if not policy:
+        raise HTTPException(status_code=404, detail="Global rotation policy not found.")
+    return policy
 
 
 @router.post("/my-location/rotation-policy", response_model=RotationPolicyResponse, status_code=status.HTTP_201_CREATED)
@@ -310,10 +321,21 @@ def create_location_policy(
     and Scope ID defaults to the current Location Head's physical assignment location.
     """
     location = get_current_location_record(db, current_user_id)
+    existing_policy = db.execute(
+        select(RotationPolicy).where(
+            RotationPolicy.scope_type == policy_scope.LOCAL.value,
+            RotationPolicy.scope_id == location.id,
+        )
+    ).scalars().first()
+    if existing_policy:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A local rotation policy already exists for this location.",
+        )
     
     # Payload configuration mapped directly to DB object
     new_policy = RotationPolicy(
-        scope_type=policy_scope.LOCAL,
+        scope_type=policy_scope.LOCAL.value,
         scope_id=location.id,
         rules_config=payload.rules_config.model_dump()
     )
@@ -342,7 +364,7 @@ def update_location_policy(
         raise HTTPException(status_code=404, detail="Rotation policy record not found.")
         
     # Jurisdiction Check
-    if policy.scope_id != location.id:
+    if policy.scope_type != policy_scope.LOCAL.value or policy.scope_id != location.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Access Denied. This rotation policy belongs to an office outside your jurisdiction."
@@ -370,7 +392,7 @@ def delete_location_policy(
         raise HTTPException(status_code=404, detail="Rotation policy record not found.")
         
     # Jurisdiction Check
-    if policy.scope_id != location.id:
+    if policy.scope_type != policy_scope.LOCAL.value or policy.scope_id != location.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, 
             detail="Access Denied. You do not have permissions to delete another location's policies."
@@ -505,5 +527,4 @@ def review_department_head_appeal(
         db, transfer_id, loc_head.id, payload.decision, payload.manager_notes, 
         allowed_employee_ids_query=jurisdiction_query
     )
-
 
