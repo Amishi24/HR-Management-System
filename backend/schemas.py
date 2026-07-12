@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from models import policy_scope
 
@@ -279,8 +279,21 @@ class LevelGatingRules(BaseModel):
     lateral_only: List[int] = Field(default_factory=list)
     promotions_allowed: List[int] = Field(default_factory=list)
 
+class TenureRules(BaseModel):
+    min_tenure_years: int = Field(ge=0)
+    max_tenure_years: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def validate_tenure_range(self):
+        if self.min_tenure_years > self.max_tenure_years:
+            raise ValueError(
+                "min_tenure_years cannot be greater than max_tenure_years"
+            )
+        return self
+
 class RulesConfigPayload(BaseModel):
     level_gating: LevelGatingRules
+    tenure_rules: TenureRules
 
 class RotationPolicyResponse(BaseModel):
     id: int

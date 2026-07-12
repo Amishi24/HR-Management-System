@@ -474,7 +474,8 @@ def create_transfer_request(
         employee_id=employee.id,
         status="PROPOSED",
         location_preferences=payload.location_preferences,
-        audit_notes="Transfer Due to Medical Issue"
+        # audit_notes="Transfer Due to Medical Issue",
+        audit_notes="Initiated by employee via self-service portal."
     )
     
     db.add(new_transfer)
