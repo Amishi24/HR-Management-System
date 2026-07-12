@@ -4,10 +4,32 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_
 from models import (Dependent, Education, Employee, EmployeeRole, Medical, Role, Positions, 
-                    Department, TenureRecord, EmployeeTenureCompletionView, TransferRequest, transfer_status )
+                    Department, TenureRecord, EmployeeTenureCompletionView, TransferRequest, transfer_status, RotationPolicy, policy_scope )
 
 class TransferService:
 
+    @staticmethod
+    def _get_tenure_rules(db: Session, employee: Employee) -> dict:
+        # Default values
+        rules = {"min_tenure_years": 3, "max_tenure_years": 10}
+
+        # Look for a local policy first
+        if employee.current_position and employee.current_position.location_id:
+            local_policy = db.query(RotationPolicy).filter(
+                RotationPolicy.scope_type == policy_scope.LOCAL.value,
+                RotationPolicy.scope_id == employee.current_position.location_id
+            ).first()
+            if local_policy and local_policy.rules_config.get('tenure_rules'):
+                rules.update(local_policy.rules_config['tenure_rules'])
+                return rules
+
+        # Fallback to global policy
+        global_policy = db.query(RotationPolicy).filter(RotationPolicy.scope_type == policy_scope.GLOBAL.value).first()
+        if global_policy and global_policy.rules_config.get('tenure_rules'):
+            rules.update(global_policy.rules_config['tenure_rules'])
+
+        return rules
+    
     @staticmethod
     def fetch_team_list(
         db: Session, 
@@ -120,32 +142,28 @@ class TransferService:
         """
         Calculates windows for mandatory 9-10 year service markers.
         """
-        nine_years_ago = date.today() - timedelta(days=365*9)
-        ten_years_ago = date.today() - timedelta(days=365*10)
-
-        stmt = (
-            select(Employee)
-            .join(TenureRecord)
-            .where(and_(
-                TenureRecord.end_date.is_(None),
-                TenureRecord.start_date >= ten_years_ago,
-                TenureRecord.start_date <= nine_years_ago
-            ))
-            .options(
-                joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.location),
-                joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.department)
-            )
+        all_employees = db.query(Employee).options(
+            joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.location),
+            joinedload(Employee.tenure_records).joinedload(TenureRecord.position).joinedload(Positions.department)
         )
 
         if allowed_employee_ids_query is not None:
-            stmt = stmt.where(Employee.id.in_(allowed_employee_ids_query))
-
-        mandatory_transfer_emp = db.execute(stmt).scalars().all()
+            all_employees = all_employees.filter(Employee.id.in_(allowed_employee_ids_query))
+        
+        all_employees = all_employees.all()
 
         alerts = []
-        for emp in mandatory_transfer_emp:
+        for emp in all_employees:
+            tenure_rules = TransferService._get_tenure_rules(db, emp)
+            max_tenure_years = tenure_rules['max_tenure_years']
+            
+            # Using max_tenure_years for the alert window
+            warning_window_start_date = date.today() - timedelta(days=365 * (max_tenure_years - 1))
+            absolute_max_tenure_date = date.today() - timedelta(days=365 * max_tenure_years)
+
             active_tenure = next((t for t in emp.tenure_records if t.end_date is None), None)
-            if active_tenure and active_tenure.position:
+
+            if active_tenure and absolute_max_tenure_date <= active_tenure.start_date <= warning_window_start_date:
                 days_served = (date.today() - active_tenure.start_date).days
                 years_served = round(days_served / 365.25, 1)
 
@@ -157,10 +175,10 @@ class TransferService:
                     "department_name": active_tenure.position.department.name,
                     "tenure_start_date": active_tenure.start_date,
                     "years_served": years_served,
-                    "alert_type": "MANDATORY_9_YEAR_TRANSFER"
+                    "alert_type": f"MANDATORY_{max_tenure_years}_YEAR_TRANSFER"
                 })
         return alerts
-
+        
     @staticmethod
     def initiate_transfer(db: Session, initiator_id: int, target_employee_id: int, reason: str, allowed_employee_ids_query=None):
         """
@@ -178,7 +196,8 @@ class TransferService:
 
         # 2. Fetch target employee and their tenure history
         target_employee = db.query(Employee).options(
-            joinedload(Employee.tenure_records)
+            joinedload(Employee.tenure_records),
+            joinedload(Employee.current_position)
         ).filter(Employee.id == target_employee_id).first()
         
         if not target_employee:
@@ -189,12 +208,16 @@ class TransferService:
         if not active_tenure:
             raise HTTPException(status_code=400, detail="Employee does not have an active tenure record.")
 
-        # 4. Check the 3-year lock-in constraint rule (1095 days)
-        three_years_ago = date.today() - timedelta(days=1095) 
-        if active_tenure.start_date > three_years_ago:
+        # 4. Check the lock-in constraint rule
+        tenure_rules = TransferService._get_tenure_rules(db, target_employee)
+        min_tenure_years = tenure_rules['min_tenure_years']
+        lock_in_days = min_tenure_years * 365
+        
+        lock_in_date = date.today() - timedelta(days=lock_in_days) 
+        if active_tenure.start_date > lock_in_date:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Transfer blocked. Minimum 3-year lock-in rule not met."
+                detail=f"Transfer blocked. Minimum {min_tenure_years}-year lock-in rule not met."
             )
 
         # 5. Insert new TransferRequest proposal row

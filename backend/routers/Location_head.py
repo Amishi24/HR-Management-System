@@ -5,9 +5,10 @@ from typing import List
 
 from fastapi import Header
 from database import get_session 
-from models import Department, Discipline, Employee, EmployeeRole, Positions, Location, Role, RotationPolicy, policy_scope, DepartmentDisciplineCapacity
-from schemas import AppealDecisionPayload, DepartmentLookupResponse, DepartmentTransferResponse, DetailedEmployeeResponse, DisciplineLookupResponse, ExemptionContextResponse, LightTeamEmployeeResponse, LocationDetailsResponse, PositionCreateRequest, PositionDetailsResponse, PositionUpdateRequest, RotationPolicyCreateUpdate, RotationPolicyResponse, TransferAlertResponse, TransferInitiatePayload, TransferReviewPayload, UpdateLocationRequirementsRequest
+from models import Department, Discipline, Employee, EmployeeRole, Positions, Location, Role, RotationPolicy, policy_scope, DepartmentDisciplineCapacity, TransferRequest
+from schemas import AppealDecisionPayload, DepartmentLookupResponse, DepartmentTransferResponse, DetailedEmployeeResponse, DisciplineLookupResponse, ExemptionContextResponse, LightTeamEmployeeResponse, LocationDetailsResponse, PositionCreateRequest, PositionDetailsResponse, PositionUpdateRequest, RotationPolicyCreateUpdate, RotationPolicyResponse, TransferAlertResponse, TransferInitiatePayload, TransferReviewPayload, UpdateLocationRequirementsRequest, SuccessorSuggestionResponse, PositionSuggestionResponse
 from services.transfer_service import TransferService
+from services.matching_service import MatchingService
 
 router = APIRouter()
 
@@ -527,4 +528,43 @@ def review_department_head_appeal(
         db, transfer_id, loc_head.id, payload.decision, payload.manager_notes, 
         allowed_employee_ids_query=jurisdiction_query
     )
+
+
+@router.get("/transfers/{transfer_id}/successor-suggestions", response_model=List[SuccessorSuggestionResponse])
+def get_successor_suggestions(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    loc_head: Employee = Depends(get_current_loc_head)
+):
+    jurisdiction_query = get_loc_head_jurisdiction_query(loc_head, db)
+    allowed_ids = [r[0] for r in jurisdiction_query.with_entities(Employee.id).all()]
+    
+    transfer = db.query(TransferRequest).filter(TransferRequest.id == transfer_id).first()
+    if not transfer or transfer.employee_id not in allowed_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Target transfer is outside your jurisdiction."
+        )
+        
+    return MatchingService.suggest_successors(db, transfer_id=transfer_id, top_n=5)
+
+
+@router.get("/transfers/{transfer_id}/position-suggestions", response_model=List[PositionSuggestionResponse])
+def get_position_suggestions(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    loc_head: Employee = Depends(get_current_loc_head)
+):
+    jurisdiction_query = get_loc_head_jurisdiction_query(loc_head, db)
+    allowed_ids = [r[0] for r in jurisdiction_query.with_entities(Employee.id).all()]
+    
+    transfer = db.query(TransferRequest).filter(TransferRequest.id == transfer_id).first()
+    if not transfer or transfer.employee_id not in allowed_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Target transfer is outside your jurisdiction."
+        )
+        
+    return MatchingService.suggest_next_positions(db, transfer_id=transfer_id, top_n=5)
+
 
