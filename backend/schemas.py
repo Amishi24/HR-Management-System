@@ -290,3 +290,21 @@ class RotationPolicyResponse(BaseModel):
 
 class RotationPolicyCreateUpdate(BaseModel):
     rules_config: RulesConfigPayload
+
+class SuccessorSuggestionResponse(BaseModel):
+    employee_id: int
+    name: str
+    current_level: int
+    match_score: float
+    is_overdue: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PositionSuggestionResponse(BaseModel):
+    position_id: int
+    department_name: str
+    location_id: int
+    preference_rank: int
+    nlp_match_score: float
+
+    model_config = ConfigDict(from_attributes=True)

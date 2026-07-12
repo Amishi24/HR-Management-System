@@ -15,7 +15,10 @@ from schemas import (TransferCreate, LightTeamEmployeeResponse, DetailedEmployee
                      AppealDecisionPayload,
                      CapacityDashboardResponse,
                      AssignmentCreatePayload,
+                     SuccessorSuggestionResponse,
+                     PositionSuggestionResponse,
                     )
+from services.matching_service import MatchingService
 from fastapi import Header
 
 def get_user_id(current_employee_id: int = Header(..., alias="employee-id")) -> int:
@@ -630,3 +633,41 @@ def delete_employee_assignment(
     db.commit()
     
     return {"message": "Assignment deleted successfully."}
+
+
+@router.get("/transfers/{transfer_id}/successor-suggestions", response_model=List[SuccessorSuggestionResponse])
+def get_successor_suggestions(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    allowed_ids = [r[0] for r in jurisdiction_query.with_entities(Employee.id).all()]
+    
+    transfer = db.query(TransferRequest).filter(TransferRequest.id == transfer_id).first()
+    if not transfer or transfer.employee_id not in allowed_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Target transfer is outside your jurisdiction."
+        )
+        
+    return MatchingService.suggest_successors(db, transfer_id=transfer_id, top_n=5)
+
+
+@router.get("/transfers/{transfer_id}/position-suggestions", response_model=List[PositionSuggestionResponse])
+def get_position_suggestions(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    dept_head: Employee = Depends(get_current_dept_head)
+):
+    jurisdiction_query = get_team_jurisdiction_query(dept_head, db)
+    allowed_ids = [r[0] for r in jurisdiction_query.with_entities(Employee.id).all()]
+    
+    transfer = db.query(TransferRequest).filter(TransferRequest.id == transfer_id).first()
+    if not transfer or transfer.employee_id not in allowed_ids:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Forbidden. Target transfer is outside your jurisdiction."
+        )
+        
+    return MatchingService.suggest_next_positions(db, transfer_id=transfer_id, top_n=5)
