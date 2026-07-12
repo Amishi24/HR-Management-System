@@ -153,7 +153,7 @@ class MatchingService:
             .where(Employee.discipline_id == current_position.discipline_id)
             .where(Employee.id != employee.id)
         )
-        candidates = db.execute(candidates_stmt).scalars().all()
+        candidates = db.execute(candidates_stmt).scalars().unique().all()
 
         filtered_candidates = []
         for cand in candidates:
