@@ -6,6 +6,8 @@ export default function LocationPositions({
   positions,
   departments,
   disciplines,
+  filterDisciplines,
+  formDisciplines,
 
   filters,
 
@@ -73,7 +75,7 @@ export default function LocationPositions({
       <TableFilters
         filters={filters}
         departments={departments}
-        disciplines={disciplines}
+        disciplines={filterDisciplines ?? disciplines}
         onFilterChange={onFilterChange}
       />
 
@@ -89,7 +91,7 @@ export default function LocationPositions({
       <PositionForm
         form={form}
         departments={departments}
-        disciplines={disciplines}
+        disciplines={formDisciplines ?? disciplines}
         editingPosition={editingPosition}
         submitting={submitting}
         onFormChange={onFormChange}

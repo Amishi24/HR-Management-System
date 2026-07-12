@@ -34,6 +34,80 @@ export default function ManagePositions() {
     rowsPerPage: 10,
   });
 
+  const scopedDepartments = useMemo(() => {
+    const departmentNames = new Set(
+      positions.map((position) => position.department_name).filter(Boolean),
+    );
+
+    return departments.filter((department) =>
+      departmentNames.has(department.name),
+    );
+  }, [departments, positions]);
+
+  const scopedDisciplines = useMemo(() => {
+    const availableDisciplineNames = new Set(
+      positions.map((position) => position.discipline_name).filter(Boolean),
+    );
+
+    return disciplines.filter((discipline) =>
+      availableDisciplineNames.has(discipline.name),
+    );
+  }, [disciplines, positions]);
+
+  const disciplineOptionsForFilters = useMemo(() => {
+    if (!filters.department) {
+      return scopedDisciplines;
+    }
+
+    const selectedDepartment = scopedDepartments.find(
+      (department) => department.name === filters.department,
+    );
+
+    if (!selectedDepartment) {
+      return scopedDisciplines;
+    }
+
+    const departmentDisciplineNames = new Set(
+      positions
+        .filter(
+          (position) => position.department_name === selectedDepartment.name,
+        )
+        .map((position) => position.discipline_name)
+        .filter(Boolean),
+    );
+
+    return scopedDisciplines.filter((discipline) =>
+      departmentDisciplineNames.has(discipline.name),
+    );
+  }, [filters.department, positions, scopedDepartments, scopedDisciplines]);
+
+  const disciplineOptionsForForm = useMemo(() => {
+    if (!form.department_id) {
+      return scopedDisciplines;
+    }
+
+    const selectedDepartment = scopedDepartments.find(
+      (department) => department.id === Number(form.department_id),
+    );
+
+    if (!selectedDepartment) {
+      return scopedDisciplines;
+    }
+
+    const departmentDisciplineNames = new Set(
+      positions
+        .filter(
+          (position) => position.department_name === selectedDepartment.name,
+        )
+        .map((position) => position.discipline_name)
+        .filter(Boolean),
+    );
+
+    return scopedDisciplines.filter((discipline) =>
+      departmentDisciplineNames.has(discipline.name),
+    );
+  }, [form.department_id, positions, scopedDepartments, scopedDisciplines]);
+
   useEffect(() => {
     void refreshDashboard();
   }, []);
@@ -43,12 +117,11 @@ export default function ManagePositions() {
     setError("");
 
     try {
-      const [positionsRes, departmentsRes, disciplinesRes] =
-        await Promise.all([
-          getLocHeadPositions(),
-          getLocHeadDepartments(),
-          getLocHeadDisciplines(),
-        ]);
+      const [positionsRes, departmentsRes, disciplinesRes] = await Promise.all([
+        getLocHeadPositions(),
+        getLocHeadDepartments(),
+        getLocHeadDisciplines(),
+      ]);
 
       setPositions(positionsRes.data || []);
       setDepartments(departmentsRes.data || []);
@@ -185,11 +258,27 @@ export default function ManagePositions() {
   }
 
   function handleFilterChange(field, value) {
-    setFilters((prev) => ({ ...prev, [field]: value }));
+    setFilters((prev) => {
+      const nextFilters = { ...prev, [field]: value };
+
+      if (field === "department") {
+        nextFilters.discipline = "";
+      }
+
+      return nextFilters;
+    });
   }
 
   const handleFormChange = (field, value) =>
-    setForm((prev) => ({ ...prev, [field]: value }));
+    setForm((prev) => {
+      const nextForm = { ...prev, [field]: value };
+
+      if (field === "department_id") {
+        nextForm.discipline_id = "";
+      }
+
+      return nextForm;
+    });
 
   return (
     <div className="space-y-6">
@@ -207,8 +296,10 @@ export default function ManagePositions() {
         <div className="space-y-6">
           <LocationPositions
             positions={filteredPositions}
-            departments={departments}
-            disciplines={disciplines}
+            departments={scopedDepartments}
+            disciplines={scopedDisciplines}
+            filterDisciplines={disciplineOptionsForFilters}
+            formDisciplines={disciplineOptionsForForm}
             filters={filters}
             form={form}
             editingPosition={editingPosition}

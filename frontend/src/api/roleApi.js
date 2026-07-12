@@ -18,6 +18,8 @@ export const createDeptHeadAssignment = (employeeId, tenureId, payload) =>
     api.post(`/dept-head/team/${employeeId}/tenures/${tenureId}/assignments`, payload);
 export const deleteDeptHeadAssignment = (employeeId, assignmentId) =>
     api.delete(`/dept-head/team/${employeeId}/assignments/${assignmentId}`);
+export const initiateDeptHeadTransfer = (payload) =>
+    api.post("/dept-head/transfers/initiate", payload);
 
 export const getLocHeadLocation = () => api.get("/loc-head/my-location");
 export const updateLocHeadLocationRequirements = (payload) =>
@@ -29,7 +31,8 @@ export const updateLocHeadPosition = (positionId, payload) =>
 export const deleteLocHeadPosition = (positionId) => api.delete(`/loc-head/my-location/positions/${positionId}`);
 export const getLocHeadDepartments = () => api.get("/loc-head/departments");
 export const getLocHeadDisciplines = () => api.get("/loc-head/disciplines");
-export const getLocHeadPolicies = () => api.get("/loc-head/my-location/rotation-policies");
+export const getLocHeadPolicy = () => api.get("/loc-head/my-location/rotation-policy");
+export const getGlobalPolicy = () => api.get("/loc-head/global-policy");
 export const createLocHeadPolicy = (payload) => api.post("/loc-head/my-location/rotation-policy", payload);
 export const updateLocHeadPolicy = (policyId, payload) => api.patch(`/loc-head/my-location/${policyId}`, payload);
 export const deleteLocHeadPolicy = (policyId) => api.delete(`/loc-head/my-location/${policyId}`);
