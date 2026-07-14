@@ -25,6 +25,7 @@ class DependentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class AssignmentResponse(BaseModel):
+    id: int
     title: str
     weightage: int
     skills : list[str] = []

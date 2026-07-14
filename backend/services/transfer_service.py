@@ -157,15 +157,21 @@ class TransferService:
             tenure_rules = TransferService._get_tenure_rules(db, emp)
             max_tenure_years = tenure_rules['max_tenure_years']
             
-            # Using max_tenure_years for the alert window
+            # Alert during the final year before the max tenure limit and keep
+            # overdue active tenures visible until a transfer is initiated.
             warning_window_start_date = date.today() - timedelta(days=365 * (max_tenure_years - 1))
             absolute_max_tenure_date = date.today() - timedelta(days=365 * max_tenure_years)
 
             active_tenure = next((t for t in emp.tenure_records if t.end_date is None), None)
 
-            if active_tenure and absolute_max_tenure_date <= active_tenure.start_date <= warning_window_start_date:
+            if active_tenure and active_tenure.start_date <= warning_window_start_date:
                 days_served = (date.today() - active_tenure.start_date).days
                 years_served = round(days_served / 365.25, 1)
+                alert_type = (
+                    f"OVERDUE_{max_tenure_years}_YEAR_TRANSFER"
+                    if active_tenure.start_date < absolute_max_tenure_date
+                    else f"MANDATORY_{max_tenure_years}_YEAR_TRANSFER"
+                )
 
                 alerts.append({
                     "employee_id": emp.id,
@@ -175,7 +181,7 @@ class TransferService:
                     "department_name": active_tenure.position.department.name,
                     "tenure_start_date": active_tenure.start_date,
                     "years_served": years_served,
-                    "alert_type": f"MANDATORY_{max_tenure_years}_YEAR_TRANSFER"
+                    "alert_type": alert_type
                 })
         return alerts
         
