@@ -336,6 +336,7 @@ def get_tenure_details(
     formatted_assignments = []
     for assignment in t_record.assignments:
         formatted_assignments.append({
+            "id": assignment.id,
             "title": assignment.title,
             "weightage": assignment.weightage,
             "skills": assignment.skills
