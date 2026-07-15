@@ -2,44 +2,91 @@ import { useEffect, useState } from "react";
 
 import {
   decideLocHeadAppeal,
+  getLocHeadAlerts,
   getLocHeadAppealContext,
   getLocHeadTeam,
+  getLocHeadTeamMember,
   getLocHeadTransfers,
+  initiateLocHeadTransfer,
   reviewLocHeadTransfer,
 } from "../../api/roleApi";
 import LocTeamRoster from "./LocTeamRoster";
+import LocHeadEmployeeDetail from "./LocHeadEmployeeDetail";
 import TransferReviewQueue from "../manager/TransferReviewQueue";
 import AppealReview from "../manager/AppealReview";
+import MandatoryTransferAlerts from "../dept-head/MandatoryTransferAlerts";
 
 export default function TransferWorkflow() {
   const [transfers, setTransfers] = useState([]);
   const [team, setTeam] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [appealContext, setAppealContext] = useState(null);
   const [reviewNotes, setReviewNotes] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     void refreshDashboard();
   }, []);
 
-  async function refreshDashboard() {
-    setLoading(true);
+  async function refreshDashboard(showLoading = true) {
+    if (showLoading) {
+      setLoading(true);
+    }
     setError("");
 
     try {
-      const [transfersRes, teamRes] = await Promise.all([
+      const [transfersRes, teamRes, alertsRes] = await Promise.all([
         getLocHeadTransfers(),
         getLocHeadTeam(),
+        getLocHeadAlerts(),
       ]);
       setTransfers(transfersRes.data || []);
       setTeam(teamRes.data || []);
+      setAlerts(alertsRes.data || []);
     } catch (err) {
       console.error(err);
       setError("Unable to load the transfer workflow right now.");
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
+    }
+  }
+
+  async function fetchEmployeeDetail(employeeId) {
+    setLoadingDetail(true);
+
+    try {
+      const res = await getLocHeadTeamMember(employeeId);
+      setSelectedEmployee(res.data);
+    } catch (err) {
+      console.error(err);
+      setSelectedEmployee({
+        error: "Unable to load this department head profile.",
+      });
+    } finally {
+      setLoadingDetail(false);
+    }
+  }
+
+  async function handleInitiateTransfer(employeeId, reason) {
+    try {
+      const res = await initiateLocHeadTransfer({
+        employee_id: employeeId,
+        reason,
+      });
+      await fetchEmployeeDetail(employeeId);
+      await refreshDashboard(false);
+      return { success: true, message: res.data.message };
+    } catch (err) {
+      console.error(err);
+      const errorMsg =
+        err.response?.data?.detail || "The transfer could not be initiated.";
+      return { success: false, message: errorMsg };
     }
   }
 
@@ -114,7 +161,20 @@ export default function TransferWorkflow() {
         </div>
       ) : (
         <div className="space-y-6">
-          <LocTeamRoster team={team} />
+          <MandatoryTransferAlerts alerts={alerts} />
+
+          <LocTeamRoster team={team} onViewEmployee={fetchEmployeeDetail} />
+
+          {loadingDetail ? (
+            <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-slate-500">
+              Loading department head profile…
+            </div>
+          ) : (
+            <LocHeadEmployeeDetail
+              employee={selectedEmployee}
+              onInitiateTransfer={handleInitiateTransfer}
+            />
+          )}
 
           <TransferReviewQueue
             transfers={transfers.filter((transfer) =>
