@@ -318,7 +318,7 @@ class PositionSuggestionResponse(BaseModel):
     position_id: int
     department_name: str
     location_id: int
-    preference_rank: int
+    location_pref_id: int
     nlp_match_score: float
 
     model_config = ConfigDict(from_attributes=True)

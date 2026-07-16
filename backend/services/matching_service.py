@@ -434,10 +434,10 @@ class MatchingService:
                 "position_id": pos.id,
                 "department_name": pos.department.name if pos.department else "Unknown",
                 "location_id": pos.location_id,
-                "preference_rank": preference_rank,
+                "location_pref_id": preference_rank,
                 "nlp_match_score": nlp_match_score
             })
 
         # Step 6: Return sorted results
-        results.sort(key=lambda x: (x["preference_rank"], -x["nlp_match_score"]))
+        results.sort(key=lambda x: (x["location_pref_id"], -x["nlp_match_score"]))
         return results[:top_n]
