@@ -11,6 +11,7 @@ import {
 } from "../../api/employeeApi";
 
 const PORTAL_INITIATED_TEXT = "Initiated by employee via self-service portal.";
+const TERMINAL_TRANSFER_STATUSES = new Set(["COMPLETED", "CANCELLED"]);
 
 export default function TransferRequestsCard() {
   const [transfers, setTransfers] = useState([]);
@@ -204,8 +205,8 @@ export default function TransferRequestsCard() {
     return request.audit_notes?.trim() === PORTAL_INITIATED_TEXT;
   };
 
-  const hasProposedRequest = transfers.some(
-    (r) => r.status?.toUpperCase() === "PROPOSED",
+  const canRequestNewTransfer = transfers.every((request) =>
+    TERMINAL_TRANSFER_STATUSES.has(request.status?.toUpperCase()),
   );
 
   const formatDate = (dateString) => {
@@ -414,7 +415,7 @@ export default function TransferRequestsCard() {
         {!showForm &&
           !editingTransfer &&
           !appealingTransfer &&
-          !hasProposedRequest && (
+          canRequestNewTransfer && (
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
               <button
                 onClick={openCreateWorkspace}
