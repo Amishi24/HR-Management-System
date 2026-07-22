@@ -14,10 +14,11 @@ export default function EmployeeLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const isManagerRole = role === "DEPT_HEAD" || role === "LOC_HEAD";
+  const isManagerRole = role === "DEPT_HEAD" || role === "LOC_HEAD" || role === "TRANSFER_HEAD";
   const isManagerRoute =
     location.pathname.startsWith("/dept-head/manager") ||
-    location.pathname.startsWith("/loc-head/manager");
+    location.pathname.startsWith("/loc-head/manager") ||
+    location.pathname.startsWith("/transfer-head/manager");
   const activeView = isManagerRoute ? "manager" : "personal";
 
   const handleViewChange = (selectedView) => {
@@ -34,6 +35,16 @@ export default function EmployeeLayout() {
       window.location.assign(
         selectedView === "manager" ? "/loc-head/manager" : "/loc-head/personal",
       );
+      return;
+    }
+
+    if (role === "TRANSFER_HEAD") {
+      window.location.assign(
+        selectedView === "manager"
+          ? "/transfer-head/manager"
+          : "/transfer-head/personal",
+      );
+      return;
     }
   };
 

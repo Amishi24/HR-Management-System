@@ -280,6 +280,7 @@ class LevelGatingRules(BaseModel):
     lateral_only: List[int] = Field(default_factory=list)
     promotions_allowed: List[int] = Field(default_factory=list)
 
+
 class TenureRules(BaseModel):
     min_tenure_years: int = Field(ge=0)
     max_tenure_years: int = Field(ge=0)

@@ -281,110 +281,6 @@ def get_all_disciplines(db: Session = Depends(get_session)):
 #  ROTATION POLICY UNDER LOC_HEAD
 # ==========================================
 
-@router.get("/my-location/rotation-policies", response_model=List[RotationPolicyResponse])
-def get_my_location_policies(
-    db: Session = Depends(get_session),
-    current_user_id: int = Depends(get_user_id),
-):
-    """
-    Retrieves all rotation policies defined for the current Location Head's site assignment.
-    """
-    location = get_current_location_record(db, current_user_id)
-    
-    stmt = (
-        select(RotationPolicy)
-        .where(RotationPolicy.scope_id == location.id)
-        .order_by(RotationPolicy.id.asc())
-    )
-    policies = db.execute(stmt).scalars().all()
-    return policies
-
-
-@router.post("/my-location/rotation-policy", response_model=RotationPolicyResponse, status_code=status.HTTP_201_CREATED)
-def create_location_policy(
-    payload: RotationPolicyCreateUpdate,
-    db: Session = Depends(get_session),
-    current_user_id: int = Depends(get_user_id),
-):
-    """
-    Creates a new Local Rotation Policy. Scope Type is automatically assigned to 'LOCAL'
-    and Scope ID defaults to the current Location Head's physical assignment location.
-    """
-    location = get_current_location_record(db, current_user_id)
-    
-    # Payload configuration mapped directly to DB object
-    new_policy = RotationPolicy(
-        scope_type=policy_scope.LOCAL,
-        scope_id=location.id,
-        rules_config=payload.rules_config.model_dump()
-    )
-    
-    db.add(new_policy)
-    db.commit()
-    db.refresh(new_policy)
-    return new_policy
-
-
-@router.patch("/my-location/{policy_id}", response_model=RotationPolicyResponse)
-def update_location_policy(
-    policy_id: int,
-    payload: RotationPolicyCreateUpdate,
-    db: Session = Depends(get_session),
-    current_user_id: int = Depends(get_user_id),
-):
-    """
-    Modifies the rule configurations of an existing local site assignment rotation policy.
-    Validates structural jurisdiction boundaries before mutation.
-    """
-    location = get_current_location_record(db, current_user_id)
-    
-    policy = db.get(RotationPolicy, policy_id)
-    if not policy:
-        raise HTTPException(status_code=404, detail="Rotation policy record not found.")
-        
-    # Jurisdiction Check
-    if policy.scope_id != location.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Access Denied. This rotation policy belongs to an office outside your jurisdiction."
-        )
-        
-    policy.rules_config = payload.rules_config.model_dump()
-    db.commit()
-    db.refresh(policy)
-    return policy
-
-
-@router.delete("/my-location/{policy_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_location_policy(
-    policy_id: int,
-    db: Session = Depends(get_session),
-    current_user_id: int = Depends(get_user_id),
-):
-    """
-    Removes a rotation policy from the database if it falls under the manager's jurisdiction.
-    """
-    location = get_current_location_record(db, current_user_id)
-    
-    policy = db.get(RotationPolicy, policy_id)
-    if not policy:
-        raise HTTPException(status_code=404, detail="Rotation policy record not found.")
-        
-    # Jurisdiction Check
-    if policy.scope_id != location.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
-            detail="Access Denied. You do not have permissions to delete another location's policies."
-        )
-        
-    db.delete(policy)
-    db.commit()
-    return None
-
-# ==========================================
-#  ROTATION POLICY UNDER LOC_HEAD
-# ==========================================
-
 @router.get("/my-location/rotation-policy", response_model=RotationPolicyResponse | None)
 def get_my_location_policy(
     db: Session = Depends(get_session),
@@ -506,7 +402,6 @@ def delete_location_policy(
     db.delete(policy)
     db.commit()
     return None
-
 
 # ==========================================
 #  TRANSFER WORKFLOW

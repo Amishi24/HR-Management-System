@@ -7,6 +7,7 @@ import EmployeeProfilePage from "./pages/EmployeeProfilePage";
 import TransferRequestsPage from "./pages/TransferRequestsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
+import TransferHeadDashboardPage from "./pages/TransferHeadDashboardPage";
 
 function App() {
   return (
@@ -95,6 +96,31 @@ function App() {
           <Route
             path="dashboard"
             element={<Navigate to="/loc-head/personal" replace />}
+          />
+        </Route>
+      </Route>
+
+      <Route
+        element={<ProtectedRoute allowedRoles={["TRANSFER_HEAD", "transfer_head"]} />}
+      >
+        <Route path="/transfer-head" element={<EmployeeLayout />}>
+          <Route index element={<Navigate to="/transfer-head/manager" replace />} />
+          <Route path="personal" element={<EmployeeDashboard />} />
+          <Route path="personal/profile" element={<EmployeeProfilePage />} />
+          <Route path="personal/transfers" element={<TransferRequestsPage />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/transfer-head/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<TransferHeadDashboardPage />}
+          />
+          <Route
+            path="dashboard"
+            element={<Navigate to="/transfer-head/personal" replace />}
           />
         </Route>
       </Route>

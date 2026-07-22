@@ -29,6 +29,8 @@ export default function LoginPage() {
         navigate("/dept-head/manager", { replace: true });
       } else if (userRole === "LOC_HEAD") {
         navigate("/loc-head/manager", { replace: true });
+      } else if (userRole === "TRANSFER_HEAD") {
+        navigate("/transfer-head/manager", { replace: true });
       } else {
         navigate("/employee/dashboard", { replace: true });
       }

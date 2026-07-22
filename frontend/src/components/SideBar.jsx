@@ -9,6 +9,7 @@ import {
   MapPinned,
   ChevronLeft,
   ChevronRight,
+  RotateCcw,
 } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
@@ -28,6 +29,12 @@ const roleConfigs = {
     managerBasePath: "/loc-head/manager",
     managerLabel: "Location Head Workspace",
     managerIcon: MapPinned,
+  },
+  TRANSFER_HEAD: {
+    personalBasePath: "/transfer-head/personal",
+    managerBasePath: "/transfer-head/manager",
+    managerLabel: "Transfer Head Workspace",
+    managerIcon: RotateCcw,
   },
 };
 
@@ -111,6 +118,17 @@ const getNavigationItems = (role, view) => {
       ];
     }
 
+    if (role === "TRANSFER_HEAD") {
+      return [
+        {
+          key: "cycle-dashboard",
+          label: "Cycle Dashboard",
+          icon: RotateCcw,
+          to: "/transfer-head/manager/dashboard",
+        },
+      ];
+    }
+
     return [];
   }
 
@@ -140,7 +158,8 @@ export default function SideBar({ isCollapsed, onToggleCollapse }) {
   const employeeId = getEmployeeId() || "N/A";
   const isManagerRoute =
     location.pathname.startsWith("/dept-head/manager") ||
-    location.pathname.startsWith("/loc-head/manager");
+    location.pathname.startsWith("/loc-head/manager") ||
+    location.pathname.startsWith("/transfer-head/manager");
   const view = isManagerRoute ? "manager" : "personal";
   const navItems = getNavigationItems(role, view);
 
