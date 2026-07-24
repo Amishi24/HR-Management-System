@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  Stethoscope,
 } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
@@ -35,6 +36,12 @@ const roleConfigs = {
     managerBasePath: "/transfer-head/manager",
     managerLabel: "Transfer Head Workspace",
     managerIcon: RotateCcw,
+  },
+  MED_OFFICER: {
+    personalBasePath: null,
+    managerBasePath: "/med-officer/manager",
+    managerLabel: "Medical Appeals Workspace",
+    managerIcon: Stethoscope,
   },
 };
 
@@ -129,6 +136,17 @@ const getNavigationItems = (role, view) => {
       ];
     }
 
+    if (role === "MED_OFFICER") {
+      return [
+        {
+          key: "appeals-dashboard",
+          label: "Appeals Dashboard",
+          icon: Stethoscope,
+          to: "/med-officer/manager/dashboard",
+        },
+      ];
+    }
+
     return [];
   }
 
@@ -159,7 +177,8 @@ export default function SideBar({ isCollapsed, onToggleCollapse }) {
   const isManagerRoute =
     location.pathname.startsWith("/dept-head/manager") ||
     location.pathname.startsWith("/loc-head/manager") ||
-    location.pathname.startsWith("/transfer-head/manager");
+    location.pathname.startsWith("/transfer-head/manager") ||
+    location.pathname.startsWith("/med-officer/manager");
   const view = isManagerRoute ? "manager" : "personal";
   const navItems = getNavigationItems(role, view);
 

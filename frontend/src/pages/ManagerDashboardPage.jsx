@@ -3,6 +3,7 @@ import { getRole } from "../utils/auth";
 import EmployeeDashboard from "./EmployeeDashboard";
 import DeptHeadManagerView from "../components/dept-head/DeptHeadManagerView";
 import LocationHeadManagerView from "../components/loc-head/LocationHeadManagerView";
+import MedicalOfficerManagerView from "../components/med-officer/MedicalOfficerManagerView";
 
 export default function ManagerDashboardPage() {
   const location = useLocation();
@@ -22,6 +23,11 @@ export default function ManagerDashboardPage() {
     LOC_HEAD: {
       title: "Location Head Workspace",
       managerComponent: <LocationHeadManagerView />,
+    },
+
+    MED_OFFICER: {
+      title: "Medical Appeals Workspace",
+      managerComponent: <MedicalOfficerManagerView />,
     },
   };
 
@@ -47,6 +53,8 @@ export default function ManagerDashboardPage() {
     } else if (path.includes("/employee-directory")) {
       pageTitle = "Employee Directory";
     }
+  } else if (role === "MED_OFFICER") {
+    pageTitle = "Medical Appeals Workspace";
   }
 
   return (

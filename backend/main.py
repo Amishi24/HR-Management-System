@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 # Import our setup from the files we just created
 from database import get_session
-from routers import employee, login, Department_head, Location_head, policy, routes_transfer_head
+from routers import employee, login, Department_head, Location_head, Medical_officer, policy, routes_transfer_head
 
 # Initialize the FastAPI application
 app = FastAPI(title="ONGC HR Management System")
@@ -22,12 +22,12 @@ app.include_router(employee.router, prefix="/me", tags=["employee[self]"])
 app.include_router(login.router, prefix="/auth", tags=["Authentication"])
 app.include_router(Department_head.router, prefix="/dept-head", tags=["Department Head"])
 app.include_router(Location_head.router, prefix="/loc-head", tags=["Location Head"])
+app.include_router(Medical_officer.router, prefix="/med-officer", tags=["Medical Officer"])
 app.include_router(policy.router, prefix="/api", tags=["Policy"])
 app.include_router(routes_transfer_head.router, prefix="/api/v1/transfer-head", tags=["Transfer Head"])
 
 @app.get("/")
 def health_check():
     return {"status": "System Online", "database": "Connected"}
-
 
 

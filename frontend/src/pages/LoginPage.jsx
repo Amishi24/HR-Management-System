@@ -31,6 +31,8 @@ export default function LoginPage() {
         navigate("/loc-head/manager", { replace: true });
       } else if (userRole === "TRANSFER_HEAD") {
         navigate("/transfer-head/manager", { replace: true });
+      } else if (userRole === "MED_OFFICER") {
+        navigate("/med-officer/manager/dashboard", { replace: true });
       } else {
         navigate("/employee/dashboard", { replace: true });
       }

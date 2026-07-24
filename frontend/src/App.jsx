@@ -124,6 +124,27 @@ function App() {
           />
         </Route>
       </Route>
+
+      <Route
+        element={<ProtectedRoute allowedRoles={["MED_OFFICER", "med_officer"]} />}
+      >
+        <Route path="/med-officer" element={<EmployeeLayout />}>
+          <Route
+            index
+            element={<Navigate to="/med-officer/manager/dashboard" replace />}
+          />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/med-officer/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<ManagerDashboardPage />}
+          />
+        </Route>
+      </Route>
     </Routes>
   );
 }
