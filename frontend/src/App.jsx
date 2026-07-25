@@ -8,6 +8,8 @@ import TransferRequestsPage from "./pages/TransferRequestsPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import TransferHeadDashboardPage from "./pages/TransferHeadDashboardPage";
+import TransferHeadInitiateTransfer from "./components/transfer-head/TransferHeadInitiateTransfer";
+import TransferHeadAppealsDashboard from "./components/transfer-head/TransferHeadAppealsDashboard";
 
 function App() {
   return (
@@ -105,9 +107,6 @@ function App() {
       >
         <Route path="/transfer-head" element={<EmployeeLayout />}>
           <Route index element={<Navigate to="/transfer-head/manager" replace />} />
-          <Route path="personal" element={<EmployeeDashboard />} />
-          <Route path="personal/profile" element={<EmployeeProfilePage />} />
-          <Route path="personal/transfers" element={<TransferRequestsPage />} />
           <Route
             path="manager"
             element={
@@ -119,8 +118,37 @@ function App() {
             element={<TransferHeadDashboardPage />}
           />
           <Route
+            path="manager/initiate-transfer"
+            element={<TransferHeadInitiateTransfer />}
+          />
+          <Route
+            path="manager/appeals"
+            element={<TransferHeadAppealsDashboard />}
+          />
+          <Route
             path="dashboard"
-            element={<Navigate to="/transfer-head/personal" replace />}
+            element={<Navigate to="/transfer-head/manager/dashboard" replace />}
+          />
+        </Route>
+      </Route>
+
+      <Route
+        element={<ProtectedRoute allowedRoles={["MED_OFFICER", "med_officer"]} />}
+      >
+        <Route path="/med-officer" element={<EmployeeLayout />}>
+          <Route
+            index
+            element={<Navigate to="/med-officer/manager/dashboard" replace />}
+          />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/med-officer/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<ManagerDashboardPage />}
           />
         </Route>
       </Route>

@@ -65,3 +65,16 @@ export const getLocHeadAppealContext = (transferId) =>
   api.get(`/loc-head/transfers/${transferId}/context`);
 export const decideLocHeadAppeal = (transferId, payload) =>
   api.patch(`/loc-head/transfers/${transferId}/appeal-decision`, payload);
+
+export const getTransferHeadEligibleEmployees = () =>
+  api.get("/transfer-head/transfers/eligible");
+export const initiateTransferHeadTransfer = (payload) =>
+  api.post("/transfer-head/transfers/initiate", payload);
+export const getTransferHeadEducationalAppeals = () =>
+  api.get("/transfer-head/transfers/educational-appeals");
+export const getTransferHeadAppealContext = (transferId) =>
+  api.get(`/transfer-head/transfers/${transferId}/context`);
+export const decideTransferHeadAppeal = (transferId, payload) =>
+  api.patch(`/transfer-head/transfers/${transferId}/appeal-decision`, payload);
+export const revokeTransferHeadTransfer = (transferId) =>
+  api.delete(`/transfer-head/transfers/${transferId}`);

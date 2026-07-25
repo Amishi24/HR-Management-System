@@ -200,6 +200,26 @@ class TransferService:
             if not is_valid:
                 raise HTTPException(status_code=403, detail="Employee not found in your jurisdiction.")
 
+        # Check for existing active transfer request
+        active_statuses = [
+            transfer_status.PROPOSED.name, 
+            transfer_status.APPROVED.name, 
+            transfer_status.APPEALED.name,
+            transfer_status.SUCCESSOR_ASSIGNED.name,
+            transfer_status.HANDOVER_IN_PROGRESS.name
+        ]
+        existing_request = db.query(TransferRequest).filter(
+            TransferRequest.employee_id == target_employee_id,
+            TransferRequest.status.in_(active_statuses)
+        ).first()
+
+        if existing_request:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Employee already has an active transfer request in '{existing_request.status}' state."
+            )
+
+
         # 2. Fetch target employee and their tenure history
         target_employee = db.query(Employee).options(
             joinedload(Employee.tenure_records),

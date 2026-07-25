@@ -242,7 +242,7 @@ export default function TransferHeadDashboardPage() {
   useEffect(() => {
     setEmpsLoading(true);
     api
-      .get("/api/v1/transfer-head/approved-employees")
+      .get("/transfer-head/approved-employees")
       .then(({ data }) => setApprovedEmps(data))
       .catch(() => setApprovedEmps([]))
       .finally(() => setEmpsLoading(false));
@@ -255,7 +255,7 @@ export default function TransferHeadDashboardPage() {
       setCycleError(null);
       try {
         const { data } = await api.post(
-          "/api/v1/transfer-head/cycle/generate",
+          "/transfer-head/cycle/generate",
           {
             exempt_employee_ids: ids,
             seed_employee_id: seed ?? undefined,
@@ -308,7 +308,7 @@ export default function TransferHeadDashboardPage() {
     if (!cycle) return;
     setExecuting(true);
     try {
-      await api.post("/api/v1/transfer-head/cycle/execute", {
+      await api.post("/transfer-head/cycle/execute", {
         steps: cycle.steps,
       });
       setToast({
@@ -323,7 +323,7 @@ export default function TransferHeadDashboardPage() {
       dialogRef.current?.close();
       // Refresh approved list
       api
-        .get("/api/v1/transfer-head/approved-employees")
+        .get("/transfer-head/approved-employees")
         .then(({ data }) => setApprovedEmps(data));
     } catch (err) {
       setToast({
@@ -341,7 +341,7 @@ export default function TransferHeadDashboardPage() {
   const fetchOverview = useCallback(async () => {
     setOverviewLoading(true);
     try {
-      const { data } = await api.get("/api/v1/transfer-head/requests/overview");
+      const { data } = await api.get("/transfer-head/requests/overview");
       setOverview(data);
     } catch {
       setOverview(null);

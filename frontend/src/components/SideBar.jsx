@@ -10,6 +10,8 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
+  Stethoscope,
+  GraduationCap,
 } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
@@ -31,10 +33,16 @@ const roleConfigs = {
     managerIcon: MapPinned,
   },
   TRANSFER_HEAD: {
-    personalBasePath: "/transfer-head/personal",
+    personalBasePath: null,
     managerBasePath: "/transfer-head/manager",
     managerLabel: "Transfer Head Workspace",
     managerIcon: RotateCcw,
+  },
+  MED_OFFICER: {
+    personalBasePath: null,
+    managerBasePath: "/med-officer/manager",
+    managerLabel: "Medical Appeals Workspace",
+    managerIcon: Stethoscope,
   },
 };
 
@@ -126,6 +134,29 @@ const getNavigationItems = (role, view) => {
           icon: RotateCcw,
           to: "/transfer-head/manager/dashboard",
         },
+        {
+          key: "initiate-transfer",
+          label: "Initiate Transfer",
+          icon: SendToBack,
+          to: "/transfer-head/manager/initiate-transfer",
+        },
+        {
+          key: "appeals-dashboard",
+          label: "Appeals Dashboard",
+          icon: GraduationCap,
+          to: "/transfer-head/manager/appeals",
+        },
+      ];
+    }
+
+    if (role === "MED_OFFICER") {
+      return [
+        {
+          key: "appeals-dashboard",
+          label: "Appeals Dashboard",
+          icon: Stethoscope,
+          to: "/med-officer/manager/dashboard",
+        },
       ];
     }
 
@@ -159,7 +190,8 @@ export default function SideBar({ isCollapsed, onToggleCollapse }) {
   const isManagerRoute =
     location.pathname.startsWith("/dept-head/manager") ||
     location.pathname.startsWith("/loc-head/manager") ||
-    location.pathname.startsWith("/transfer-head/manager");
+    location.pathname.startsWith("/transfer-head/manager") ||
+    location.pathname.startsWith("/med-officer/manager");
   const view = isManagerRoute ? "manager" : "personal";
   const navItems = getNavigationItems(role, view);
 

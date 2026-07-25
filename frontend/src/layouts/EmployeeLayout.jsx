@@ -14,11 +14,16 @@ export default function EmployeeLayout() {
     return <Navigate to="/login" replace />;
   }
 
-  const isManagerRole = role === "DEPT_HEAD" || role === "LOC_HEAD" || role === "TRANSFER_HEAD";
+  const isManagerRole =
+    role === "DEPT_HEAD" ||
+    role === "LOC_HEAD" ||
+    role === "TRANSFER_HEAD" ||
+    role === "MED_OFFICER";
   const isManagerRoute =
     location.pathname.startsWith("/dept-head/manager") ||
     location.pathname.startsWith("/loc-head/manager") ||
-    location.pathname.startsWith("/transfer-head/manager");
+    location.pathname.startsWith("/transfer-head/manager") ||
+    location.pathname.startsWith("/med-officer/manager");
   const activeView = isManagerRoute ? "manager" : "personal";
 
   const handleViewChange = (selectedView) => {
@@ -67,7 +72,7 @@ export default function EmployeeLayout() {
       </div>
 
       <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
-        {isManagerRole && (
+        {isManagerRole && role !== "MED_OFFICER" && role !== "TRANSFER_HEAD" && (
           <div className="mb-6 flex justify-end">
             <RoleDashboardSwitcher
               activeView={activeView}
