@@ -11,6 +11,7 @@ import {
   ChevronRight,
   RotateCcw,
   Stethoscope,
+  GraduationCap,
 } from "lucide-react";
 import { getEmployeeId, getEmployeeName, getRole, logout } from "../utils/auth";
 
@@ -32,7 +33,7 @@ const roleConfigs = {
     managerIcon: MapPinned,
   },
   TRANSFER_HEAD: {
-    personalBasePath: "/transfer-head/personal",
+    personalBasePath: null,
     managerBasePath: "/transfer-head/manager",
     managerLabel: "Transfer Head Workspace",
     managerIcon: RotateCcw,
@@ -132,6 +133,18 @@ const getNavigationItems = (role, view) => {
           label: "Cycle Dashboard",
           icon: RotateCcw,
           to: "/transfer-head/manager/dashboard",
+        },
+        {
+          key: "initiate-transfer",
+          label: "Initiate Transfer",
+          icon: SendToBack,
+          to: "/transfer-head/manager/initiate-transfer",
+        },
+        {
+          key: "appeals-dashboard",
+          label: "Appeals Dashboard",
+          icon: GraduationCap,
+          to: "/transfer-head/manager/appeals",
         },
       ];
     }

@@ -72,7 +72,7 @@ export default function EmployeeLayout() {
       </div>
 
       <main className="flex-1 overflow-y-auto px-4 py-8 sm:px-8 lg:px-12">
-        {isManagerRole && role !== "MED_OFFICER" && (
+        {isManagerRole && role !== "MED_OFFICER" && role !== "TRANSFER_HEAD" && (
           <div className="mb-6 flex justify-end">
             <RoleDashboardSwitcher
               activeView={activeView}
