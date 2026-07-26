@@ -115,6 +115,14 @@ class MedicalResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+class MedicalApprovalPayload(BaseModel):
+    is_approve: bool
+
+class MedicalOfficerMedicalResponse(MedicalResponse):
+    employee_id: int
+    employee_name: str
+    current_department: Optional[str] = None
+
 
 class TransferCreate(BaseModel):
     location_preferences: List[int] = Field(..., min_length=1, max_length=3)
@@ -199,6 +207,14 @@ class TransferReviewPayload(BaseModel):
 class TransferAppealPayload(BaseModel):
     appeal_type: str = Field(..., pattern="^(MEDICAL|EDUCATION)$")
     appeal_notes: str
+    location_preferences: List[int] = Field(..., min_length=1, max_length=3)
+
+class TransferAcceptPayload(BaseModel):
+    location_preferences: List[int] = Field(..., min_length=1, max_length=3)
+
+class VoluntaryEligibilityResponse(BaseModel):
+    is_eligible: bool
+    message: str
 
 class ExemptionContextResponse(BaseModel):
     medical_issues: list[str] = []

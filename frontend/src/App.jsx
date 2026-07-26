@@ -10,6 +10,7 @@ import ManagerDashboardPage from "./pages/ManagerDashboardPage";
 import TransferHeadDashboardPage from "./pages/TransferHeadDashboardPage";
 import TransferHeadInitiateTransfer from "./components/transfer-head/TransferHeadInitiateTransfer";
 import TransferHeadAppealsDashboard from "./components/transfer-head/TransferHeadAppealsDashboard";
+import TransferHeadVoluntaryRequestsPage from "./pages/TransferHeadVoluntaryRequestsPage";
 
 function App() {
   return (
@@ -124,6 +125,10 @@ function App() {
           <Route
             path="manager/appeals"
             element={<TransferHeadAppealsDashboard />}
+          />
+          <Route
+            path="manager/voluntary-requests"
+            element={<TransferHeadVoluntaryRequestsPage />}
           />
           <Route
             path="dashboard"

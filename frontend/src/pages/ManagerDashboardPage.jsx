@@ -26,7 +26,7 @@ export default function ManagerDashboardPage() {
     },
 
     MED_OFFICER: {
-      title: "Medical Appeals Workspace",
+      title: "Medical Officer Workspace",
       managerComponent: <MedicalOfficerManagerView />,
     },
   };
@@ -54,7 +54,7 @@ export default function ManagerDashboardPage() {
       pageTitle = "Employee Directory";
     }
   } else if (role === "MED_OFFICER") {
-    pageTitle = "Medical Appeals Workspace";
+    pageTitle = "Medical Officer Workspace";
   }
 
   return (

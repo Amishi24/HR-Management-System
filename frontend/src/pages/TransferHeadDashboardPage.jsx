@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../api/axios";
+import { revokeTransferHeadTransfer } from "../api/roleApi";
 import {
   RefreshCw,
   Play,
@@ -21,6 +22,7 @@ import {
   Loader2,
   UserCheck,
   ChevronDown,
+  Trash2,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -355,11 +357,16 @@ export default function TransferHeadDashboardPage() {
   }, [activeTab, overview, fetchOverview]);
 
   const filteredRequests = (overview?.requests || []).filter((r) => {
-    const matchName = r.employee_name
-      ?.toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    const term = searchQuery.trim().toLowerCase();
+    const matchSearch = !term || [
+      r.employee_name,
+      r.employee_id,
+      r.discipline,
+      r.current_location,
+      ...(r.preferred_cities || []),
+    ].some((val) => String(val || "").toLowerCase().includes(term));
     const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
-    return matchName && matchStatus;
+    return matchSearch && matchStatus;
   });
 
   const seedEmployee = approvedEmps.find((e) => e.employee_id === seedId);
@@ -720,12 +727,12 @@ export default function TransferHeadDashboardPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search
-                    size={15}
-                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={16}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
-                    type="text"
-                    placeholder="Search by employee name…"
+                    type="search"
+                    placeholder="Search by name, ID, discipline, department, or location"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
@@ -743,28 +750,32 @@ export default function TransferHeadDashboardPage() {
                 </select>
               </div>
 
-              {/* Table */}
+              {/* Table Container */}
               <div className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden">
                 {filteredRequests.length === 0 ? (
                   <p className="py-14 text-center text-sm text-slate-400">
                     No matching requests found.
                   </p>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[28rem] overflow-y-auto">
                     <table className="w-full text-sm">
-                      <thead>
+                      <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
                         <tr className="border-b border-slate-100 bg-slate-50/60">
                           {[
                             "Employee",
                             "ID",
+                            "Discipline",
                             "Status",
                             "Location",
                             "Preferred Cities",
                             "Created",
+                            "Actions",
                           ].map((h) => (
                             <th
                               key={h}
-                              className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider"
+                              className={`px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider ${
+                                h === "Actions" ? "text-right" : "text-left"
+                              }`}
                             >
                               {h}
                             </th>
@@ -783,6 +794,9 @@ export default function TransferHeadDashboardPage() {
                             <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">
                               {r.employee_id}
                             </td>
+                            <td className="px-5 py-3.5 text-slate-600 font-medium">
+                              {r.discipline || "Unassigned"}
+                            </td>
                             <td className="px-5 py-3.5">
                               <span
                                 className={`text-xs font-bold px-2.5 py-1 rounded-md border ${statusBadge(r.status)}`}
@@ -800,6 +814,41 @@ export default function TransferHeadDashboardPage() {
                               {r.created_at
                                 ? new Date(r.created_at).toLocaleDateString()
                                 : "—"}
+                            </td>
+                            <td className="px-5 py-3.5 text-right whitespace-nowrap">
+                              {r.status === "PROPOSED" ? (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    if (
+                                      window.confirm(
+                                        `Are you sure you want to revoke the proposed transfer for ${r.employee_name}?`
+                                      )
+                                    ) {
+                                      try {
+                                        await revokeTransferHeadTransfer(r.request_id);
+                                        setToast({
+                                          type: "success",
+                                          message: "Transfer request revoked successfully.",
+                                        });
+                                        fetchOverview();
+                                      } catch (err) {
+                                        setToast({
+                                          type: "error",
+                                          message:
+                                            err.response?.data?.detail ||
+                                            "Failed to revoke transfer.",
+                                        });
+                                      }
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                >
+                                  <Trash2 size={13} /> Revoke
+                                </button>
+                              ) : (
+                                <span className="text-xs text-slate-400 italic">N/A</span>
+                              )}
                             </td>
                           </tr>
                         ))}

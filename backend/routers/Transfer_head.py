@@ -21,7 +21,7 @@ from models import (
 from services.cycle_engine_service import CycleEngineService
 from services.transfer_service import TransferService
 from schemas import (
-    TransferInitiatePayload, ExemptionContextResponse, AppealDecisionPayload, DepartmentTransferResponse
+    TransferInitiatePayload, ExemptionContextResponse, AppealDecisionPayload, DepartmentTransferResponse, DetailedEmployeeResponse
 )
 
 router = APIRouter()
@@ -119,11 +119,16 @@ def requests_overview(db: Session = Depends(get_session)):
     """
     active_statuses = [
         transfer_status.APPROVED.name,
+        transfer_status.PROPOSED.name,
+        transfer_status.APPEALED.name,
+        transfer_status.SUCCESSOR_ASSIGNED.name,
+        transfer_status.HANDOVER_IN_PROGRESS.name,
     ]
 
     stmt = (
         select(TransferRequest)
         .options(
+            joinedload(TransferRequest.employee).joinedload(Employee.discipline),
             joinedload(TransferRequest.employee)
             .joinedload(Employee.current_position)
             .joinedload(Positions.location),
@@ -164,6 +169,7 @@ def requests_overview(db: Session = Depends(get_session)):
             "request_id": req.id,
             "employee_id": emp.id if emp else None,
             "employee_name": emp.name if emp else "Unknown",
+            "discipline": emp.discipline.name if emp and emp.discipline else "Unassigned",
             "status": req.status,
             "current_location": current_city,
             "location_preferences": pref_ids,
@@ -248,6 +254,10 @@ def get_eligible_employees(
 
     response_data = []
     for row in eligible_rows:
+        active_t = active_transfers_map.get(row.employee_id)
+        if active_t:
+            continue
+
         calendar_days_served = row.time_served.days if row.time_served else 0
         years_served = round(calendar_days_served / 365.25, 1)
 
@@ -258,8 +268,12 @@ def get_eligible_employees(
         if local_rules:
             rules.update(local_rules)
         max_tenure_years = rules.get('max_tenure_years', 10)
-
-        active_t = active_transfers_map.get(row.employee_id)
+        min_tenure_years = rules.get('min_tenure_years', 3)
+        
+        if years_served < min_tenure_years:
+            continue
+            
+        is_mandatory_transfer = years_served >= max_tenure_years
 
         response_data.append({
             "employee_id": row.employee_id,
@@ -270,12 +284,76 @@ def get_eligible_employees(
             "level": row.level or 0,
             "years_served": years_served,
             "max_tenure_years": max_tenure_years,
+            "is_mandatory_transfer": is_mandatory_transfer,
             "start_date": row.start_date,
             "is_active": row.is_active,
-            "active_transfer_id": active_t.id if active_t else None,
-            "active_transfer_status": active_t.status if active_t else None,
         })
     return response_data
+
+@router.get("/employees/{employee_id}", response_model=DetailedEmployeeResponse)
+def get_employee_details(
+    employee_id: int,
+    db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head)
+):
+    emp_data = db.query(Employee).options(
+        joinedload(Employee.discipline),
+        joinedload(Employee.dependents),
+        joinedload(Employee.transfer_requests.and_(TransferRequest.status == transfer_status.PROPOSED.name))
+    ).filter(Employee.id == employee_id).first()
+
+    if not emp_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Employee not found."
+        )
+
+    tenures_with_math = db.query(TenureRecord, EmployeeTenureCompletionView).join(
+        EmployeeTenureCompletionView, TenureRecord.id == EmployeeTenureCompletionView.tenure_id
+    ).options(
+        joinedload(TenureRecord.position).joinedload(Positions.department),
+        joinedload(TenureRecord.position).joinedload(Positions.location),
+        joinedload(TenureRecord.assignments)
+    ).filter(
+        TenureRecord.employee_id == employee_id
+    ).order_by(TenureRecord.start_date.desc()).all()
+
+    formatted_tenures = []
+    for t_record, t_view in tenures_with_math:
+        req_years = t_record.position.location.required_tenure_years if t_record.position and t_record.position.location else 2
+        working_days_per_year = t_record.position.location.required_working_days_per_year if t_record.position and t_record.position.location else 240
+        
+        total_working_days_required = req_years * working_days_per_year
+        calendar_days_served = t_view.time_served.days if t_view.time_served else 0
+        working_days_served = int(calendar_days_served * (working_days_per_year / 365.25))
+        remaining_working_days = total_working_days_required - working_days_served
+
+        formatted_tenures.append({
+            "id": t_record.id,
+            "start_date": t_record.start_date,
+            "end_date": t_record.end_date,
+            "department_name": t_record.position.department.name if t_record.position and t_record.position.department else "Unknown",
+            "location": t_view.city,
+            "level": t_record.position.level if t_record.position else 0,
+            "is_tenure_complete": t_view.is_tenure_complete,
+            "time_served_days": working_days_served,
+            "remaining_days": remaining_working_days if remaining_working_days > 0 else 0,
+            
+            "assignments": t_record.assignments
+        })
+
+    return {
+        "id" : emp_data.id,
+        "name" : emp_data.name,
+        "email": emp_data.email,
+        "DoB" : emp_data.DoB,
+        "DoRetirement" : emp_data.DoRetirement,
+        "domicile_state" : emp_data.domicile_state,
+        "discipline_name" : emp_data.discipline.name if emp_data.discipline else None,
+        "dependents": emp_data.dependents,
+        "active_transfers": emp_data.transfer_requests,
+        "tenures" : formatted_tenures
+    }
 
 @router.post("/transfers/initiate", status_code=status.HTTP_201_CREATED)
 def initiate_employee_transfer(
@@ -313,10 +391,58 @@ def revoke_transfer_request(
             detail= f"Cannot revoke a transfer request that is marked as '{transfer.status}'."
         )
     
-    db.delete(transfer)
+    transfer.status = transfer_status.CANCELLED.name
+    current_notes = transfer.audit_notes or ""
+    today_str = date.today().isoformat()
+    transfer.audit_notes = f"{current_notes} | [Transfer Head REVOKED request - {today_str}]"
+    
     db.commit()
 
     return {"message": "Transfer request revoked successfully."}
+
+@router.get("/transfers/voluntary", response_model=list[DepartmentTransferResponse])
+def get_voluntary_transfers(
+    db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
+):
+    transfers = db.query(TransferRequest).options(
+        joinedload(TransferRequest.employee)
+        .joinedload(Employee.current_position)
+        .joinedload(Positions.department)
+    ).filter(
+        TransferRequest.status == transfer_status.PROPOSED.name,
+        TransferRequest.approved_by == None
+    ).all()
+
+    return [_to_department_transfer_response(transfer) for transfer in transfers]
+
+@router.patch("/transfers/{transfer_id}/approve-voluntary")
+def approve_voluntary_transfer(
+    transfer_id: int,
+    db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
+):
+    transfer = db.query(TransferRequest).filter(
+        TransferRequest.id == transfer_id,
+        TransferRequest.status == transfer_status.PROPOSED.name,
+        TransferRequest.approved_by == None
+    ).first()
+
+    if not transfer:
+        raise HTTPException(status_code=404, detail="Voluntary transfer request not found or already processed.")
+
+    if len(transfer.location_preferences) == 0:
+        raise HTTPException(status_code=400, detail="Cannot approve: employee hasn't submitted location preferences.")
+
+    transfer.status = transfer_status.APPROVED.name
+    transfer.approved_by = transfer_head.id
+    
+    current_notes = transfer.audit_notes or ""
+    today_str = date.today().isoformat()
+    transfer.audit_notes = f"{current_notes} | [Transfer Head ACCEPTED voluntary request - {today_str}]"
+    
+    db.commit()
+    return {"message": "Voluntary transfer request approved successfully."}
 
 def _to_department_transfer_response(transfer: TransferRequest) -> dict:
     employee = transfer.employee

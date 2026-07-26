@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Trash2, X, Edit3, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, X, CheckCircle, AlertTriangle } from "lucide-react";
 import SectionCard from "../common/SectionCard";
 import {
   getTransferRequests,
@@ -7,11 +7,12 @@ import {
   addTransferRequest,
   deleteTransferRequest,
   appealTransferRequest,
-  updateTransferPreferences,
+  checkTransferEligibility,
+  acceptTransfer,
 } from "../../api/employeeApi";
 
 const PORTAL_INITIATED_TEXT = "Initiated by employee via self-service portal.";
-const TERMINAL_TRANSFER_STATUSES = new Set(["COMPLETED", "CANCELLED"]);
+const TERMINAL_TRANSFER_STATUSES = new Set(["COMPLETED", "CANCELLED", "REJECTED"]);
 
 export default function TransferRequestsCard() {
   const [transfers, setTransfers] = useState([]);
@@ -20,17 +21,18 @@ export default function TransferRequestsCard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [actionMessage, setActionMessage] = useState("");
+  const [isEligible, setIsEligible] = useState(false);
 
   // Form/Workspace State
   const [showForm, setShowForm] = useState(false);
   const [selectedPreferences, setSelectedPreferences] = useState([
     { state: "", cityId: "" },
   ]);
-  const [editingTransfer, setEditingTransfer] = useState(null);
+  const [acceptingTransfer, setAcceptingTransfer] = useState(null);
   const [appealingTransfer, setAppealingTransfer] = useState(null);
   const [appealType, setAppealType] = useState("MEDICAL");
   const [appealNotes, setAppealNotes] = useState("");
-  const [submittingAppeal, setSubmittingAppeal] = useState(false);
+  const [submittingAction, setSubmittingAction] = useState(false);
 
   useEffect(() => {
     refreshData();
@@ -39,8 +41,12 @@ export default function TransferRequestsCard() {
   function refreshData() {
     setLoading(true);
     setError(null);
-    Promise.all([getLocations(), getTransferRequests()])
-      .then(([locationRes, transferRes]) => {
+    Promise.all([
+      getLocations(),
+      getTransferRequests(),
+      checkTransferEligibility().catch(() => ({ data: { is_eligible: false } })),
+    ])
+      .then(([locationRes, transferRes, eligibilityRes]) => {
         const rawLocations = locationRes.data || [];
         setLocations(rawLocations);
 
@@ -54,6 +60,7 @@ export default function TransferRequestsCard() {
             (a, b) => new Date(a.created_at) - new Date(b.created_at),
           ),
         );
+        setIsEligible(eligibilityRes.data?.is_eligible || false);
       })
       .catch((err) => {
         console.error("Error loading transfer records:", err);
@@ -87,7 +94,7 @@ export default function TransferRequestsCard() {
   const handlePreferenceChange = (index, field, value) => {
     const updated = [...selectedPreferences];
     if (field === "state") {
-      updated[index] = { state: value, cityId: "" }; // Reset city selection if state changes
+      updated[index] = { state: value, cityId: "" };
     } else {
       updated[index][field] = value;
     }
@@ -97,7 +104,7 @@ export default function TransferRequestsCard() {
   const openCreateWorkspace = () => {
     setSelectedPreferences([{ state: "", cityId: "" }]);
     setShowForm(true);
-    setEditingTransfer(null);
+    setAcceptingTransfer(null);
     setAppealingTransfer(null);
   };
 
@@ -138,24 +145,27 @@ export default function TransferRequestsCard() {
     }
   };
 
-  const handleUpdatePreferencesSubmit = async (e) => {
+  const handleAcceptSubmit = async (e) => {
     e.preventDefault();
     const finalCityIds = getSelectedLocationIds();
     if (!finalCityIds) return;
 
+    setSubmittingAction(true);
     try {
-      await updateTransferPreferences(editingTransfer.id, {
+      await acceptTransfer(acceptingTransfer.id, {
         location_preferences: finalCityIds,
       });
-      setActionMessage("Preferences submitted successfully!");
-      setEditingTransfer(null);
+      setActionMessage("Transfer request accepted and preferences submitted!");
+      setAcceptingTransfer(null);
       refreshData();
       setTimeout(() => setActionMessage(""), 4000);
     } catch (err) {
       console.error(err);
       alert(
-        err.response?.data?.detail || "Failed to submit location preferences.",
+        err.response?.data?.detail || "Failed to accept transfer request.",
       );
+    } finally {
+      setSubmittingAction(false);
     }
   };
 
@@ -181,13 +191,17 @@ export default function TransferRequestsCard() {
       alert("Please enter appeal notes.");
       return;
     }
-    setSubmittingAppeal(true);
+    const finalCityIds = getSelectedLocationIds();
+    if (!finalCityIds) return;
+
+    setSubmittingAction(true);
     try {
       await appealTransferRequest(appealingTransfer.id, {
         appeal_type: appealType,
         appeal_notes: appealNotes,
+        location_preferences: finalCityIds,
       });
-      setActionMessage("Transfer appeal submitted successfully!");
+      setActionMessage("Transfer appeal and preferences submitted successfully!");
       setAppealingTransfer(null);
       setAppealNotes("");
       refreshData();
@@ -197,7 +211,7 @@ export default function TransferRequestsCard() {
       const errorMsg = err.response?.data?.detail || "Failed to submit appeal.";
       alert(errorMsg);
     } finally {
-      setSubmittingAppeal(false);
+      setSubmittingAction(false);
     }
   };
 
@@ -362,37 +376,35 @@ export default function TransferRequestsCard() {
                               </button>
                             ) : (
                               <>
-                                {(request.location_preferences || []).length ===
-                                  0 && (
-                                  <button
-                                    onClick={() => {
-                                      setEditingTransfer(request);
-                                      setSelectedPreferences([
-                                        { state: "", cityId: "" },
-                                      ]);
-                                      setShowForm(false);
-                                      setAppealingTransfer(null);
-                                    }}
-                                    className="text-blue-500 hover:text-blue-700 p-1.5 hover:bg-blue-50 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
-                                    title="Submit Location Preferences"
-                                    aria-label="Submit location preferences"
-                                  >
-                                    <Edit3 size={16} />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={() => {
+                                    setAcceptingTransfer(request);
+                                    setSelectedPreferences([
+                                      { state: "", cityId: "" },
+                                    ]);
+                                    setShowForm(false);
+                                    setAppealingTransfer(null);
+                                  }}
+                                  className="flex items-center gap-1 text-xs font-semibold text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                                  title="Accept Transfer"
+                                >
+                                  <CheckCircle size={14} /> Accept
+                                </button>
                                 <button
                                   onClick={() => {
                                     setAppealingTransfer(request);
+                                    setSelectedPreferences([
+                                      { state: "", cityId: "" },
+                                    ]);
                                     setAppealType("MEDICAL");
                                     setAppealNotes("");
                                     setShowForm(false);
-                                    setEditingTransfer(null);
+                                    setAcceptingTransfer(null);
                                   }}
-                                  className="text-amber-500 hover:text-amber-700 p-1.5 hover:bg-amber-50 rounded-lg transition-colors inline-flex items-center justify-center cursor-pointer"
+                                  className="flex items-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                                   title="Decline & Appeal"
-                                  aria-label="Decline and appeal transfer request"
                                 >
-                                  <AlertTriangle size={16} />
+                                  <AlertTriangle size={14} /> Appeal
                                 </button>
                               </>
                             )}
@@ -413,8 +425,9 @@ export default function TransferRequestsCard() {
 
         {/* Create Trigger below table */}
         {!showForm &&
-          !editingTransfer &&
+          !acceptingTransfer &&
           !appealingTransfer &&
+          isEligible &&
           canRequestNewTransfer && (
             <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
               <button
@@ -428,26 +441,26 @@ export default function TransferRequestsCard() {
           )}
       </SectionCard>
 
-      {/* Creation or Preference Submission Form Workspace Box below the log table */}
-      {(showForm || editingTransfer) && (
+      {/* Creation or Acceptance Form Workspace Box */}
+      {(showForm || acceptingTransfer) && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in duration-200">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
             <div>
               <h3 className="text-lg font-bold text-slate-800">
                 {showForm
                   ? "New Transfer Application"
-                  : "Submit Location Preferences"}
+                  : "Accept Proposed Transfer"}
               </h3>
               <p className="text-xs text-slate-500">
                 {showForm
                   ? "Provide up to 3 location preferences in rank order."
-                  : "Provide up to 3 location preferences in rank order. This can only be submitted once."}
+                  : "Submit your preferred location choices to accept the transfer."}
               </p>
             </div>
             <button
               onClick={() => {
                 setShowForm(false);
-                setEditingTransfer(null);
+                setAcceptingTransfer(null);
               }}
               className="text-slate-400 hover:text-slate-600 cursor-pointer"
             >
@@ -456,9 +469,7 @@ export default function TransferRequestsCard() {
           </div>
 
           <form
-            onSubmit={
-              showForm ? handleFormSubmit : handleUpdatePreferencesSubmit
-            }
+            onSubmit={showForm ? handleFormSubmit : handleAcceptSubmit}
             className="space-y-4"
           >
             {selectedPreferences.map((pref, index) => (
@@ -539,7 +550,7 @@ export default function TransferRequestsCard() {
                   type="button"
                   onClick={() => {
                     setShowForm(false);
-                    setEditingTransfer(null);
+                    setAcceptingTransfer(null);
                   }}
                   className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
                 >
@@ -547,9 +558,14 @@ export default function TransferRequestsCard() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-slate-950 text-white rounded-xl text-sm font-medium hover:bg-black cursor-pointer shadow-sm hover:shadow"
+                  disabled={submittingAction}
+                  className="px-5 py-2 bg-slate-950 text-white rounded-xl text-sm font-medium hover:bg-black cursor-pointer shadow-sm hover:shadow disabled:opacity-50"
                 >
-                  Submit
+                  {submittingAction
+                    ? "Submitting..."
+                    : showForm
+                      ? "Submit Request"
+                      : "Accept & Submit Preferences"}
                 </button>
               </div>
             </div>
@@ -557,7 +573,7 @@ export default function TransferRequestsCard() {
         </div>
       )}
 
-      {/* Appeal Form Workspace Box below the log table */}
+      {/* Appeal Form Workspace Box */}
       {appealingTransfer && (
         <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm space-y-4 animate-in fade-in duration-200">
           <div className="flex justify-between items-center pb-3 border-b border-slate-100">
@@ -566,8 +582,7 @@ export default function TransferRequestsCard() {
                 Decline & Appeal Transfer
               </h3>
               <p className="text-xs text-slate-500">
-                Provide medical or educational grounds for appealing this
-                proposed transfer request
+                Provide medical or educational grounds and submit your preferred locations for future consideration.
               </p>
             </div>
             <button
@@ -615,6 +630,81 @@ export default function TransferRequestsCard() {
               />
             </div>
 
+            <div className="border-t border-slate-100 pt-3 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Location Preferences
+              </h4>
+              {selectedPreferences.map((pref, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col md:flex-row items-end gap-4 p-4 bg-slate-50 rounded-2xl border border-slate-100"
+                >
+                  <div className="flex-1 w-full">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      Priority {index + 1} State
+                    </label>
+                    <select
+                      value={pref.state}
+                      onChange={(e) =>
+                        handlePreferenceChange(index, "state", e.target.value)
+                      }
+                      className="w-full bg-white rounded-xl border border-slate-200 p-2.5 text-sm"
+                      required
+                    >
+                      <option value="">Select State...</option>
+                      {availableStates.map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex-1 w-full">
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      Priority {index + 1} City
+                    </label>
+                    <select
+                      value={pref.cityId}
+                      disabled={!pref.state}
+                      onChange={(e) =>
+                        handlePreferenceChange(index, "cityId", e.target.value)
+                      }
+                      className="w-full bg-white rounded-xl border border-slate-200 p-2.5 text-sm disabled:bg-slate-100"
+                      required
+                    >
+                      <option value="">Select City...</option>
+                      {getCitiesByState(pref.state).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.city}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {selectedPreferences.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemovePreferenceRow(index)}
+                      className="text-red-500 hover:bg-red-50 p-2.5 rounded-xl transition-all mb-0.5 cursor-pointer"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {selectedPreferences.length < 3 && (
+                <button
+                  type="button"
+                  onClick={handleAddPreferenceRow}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-black border border-slate-200 bg-white px-3 py-1.5 rounded-lg cursor-pointer"
+                >
+                  <Plus size={14} /> Add Preference Rank
+                </button>
+              )}
+            </div>
+
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
               <button
                 type="button"
@@ -623,16 +713,16 @@ export default function TransferRequestsCard() {
                   setAppealNotes("");
                 }}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 cursor-pointer"
-                disabled={submittingAppeal}
+                disabled={submittingAction}
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 className="px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 cursor-pointer disabled:opacity-60 shadow-sm hover:shadow"
-                disabled={submittingAppeal}
+                disabled={submittingAction}
               >
-                {submittingAppeal ? "Submitting..." : "Submit Appeal"}
+                {submittingAction ? "Submitting..." : "Submit Appeal & Preferences"}
               </button>
             </div>
           </form>
