@@ -67,6 +67,7 @@ class EmployeeMeResponse(BaseModel):
     DoRetirement: date
     domicile_state: str
     discipline_name: str
+    current_location_id: Optional[int] = None
     model_config= ConfigDict(from_attributes=True)
 
 
