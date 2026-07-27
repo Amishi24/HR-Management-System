@@ -69,7 +69,10 @@ class CycleExecuteRequest(BaseModel):
 # ── Endpoints ────────────────────────────────────────────────────────────
 
 @router.get("/approved-employees")
-def get_approved_employees(db: Session = Depends(get_session)):
+def get_approved_employees(
+    db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
+):
     """List all employees with an APPROVED transfer request for the selector UI."""
     return CycleEngineService.get_approved_employees(db)
 
@@ -78,6 +81,7 @@ def get_approved_employees(db: Session = Depends(get_session)):
 def generate_cycle(
     req: CycleGenerateRequest,
     db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
 ):
     """Generate the single best transfer cycle, honouring exemptions."""
     result = CycleEngineService.get_optimal_transfer_cycle(
@@ -98,6 +102,7 @@ def generate_cycle(
 def execute_cycle(
     req: CycleExecuteRequest,
     db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
 ):
     """Atomically execute a reviewed transfer cycle."""
     try:
@@ -112,7 +117,10 @@ def execute_cycle(
 
 
 @router.get("/requests/overview")
-def requests_overview(db: Session = Depends(get_session)):
+def requests_overview(
+    db: Session = Depends(get_session),
+    transfer_head: Employee = Depends(get_current_transfer_head),
+):
     """
     Return all pending (non-COMPLETED, non-CANCELLED) transfer requests
     together with summary metrics.
@@ -174,6 +182,7 @@ def requests_overview(db: Session = Depends(get_session)):
             "current_location": current_city,
             "location_preferences": pref_ids,
             "preferred_cities": pref_cities,
+            "is_th_initiated": req.approved_by is not None,
             "created_at": req.created_at.isoformat() if req.created_at else None,
         })
 
@@ -389,6 +398,12 @@ def revoke_transfer_request(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail= f"Cannot revoke a transfer request that is marked as '{transfer.status}'."
+        )
+
+    if transfer.approved_by is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only transfer-head initiated transfer requests can be revoked here."
         )
     
     transfer.status = transfer_status.CANCELLED.name

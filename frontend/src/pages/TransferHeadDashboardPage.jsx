@@ -816,7 +816,7 @@ export default function TransferHeadDashboardPage() {
                                 : "—"}
                             </td>
                             <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                              {r.status === "PROPOSED" ? (
+                              {r.status === "PROPOSED" && r.is_th_initiated ? (
                                 <button
                                   type="button"
                                   onClick={async () => {

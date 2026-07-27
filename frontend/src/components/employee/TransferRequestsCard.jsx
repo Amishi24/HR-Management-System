@@ -4,6 +4,7 @@ import SectionCard from "../common/SectionCard";
 import {
   getTransferRequests,
   getLocations,
+  getProfile,
   addTransferRequest,
   deleteTransferRequest,
   appealTransferRequest,
@@ -22,6 +23,7 @@ export default function TransferRequestsCard() {
   const [error, setError] = useState(null);
   const [actionMessage, setActionMessage] = useState("");
   const [isEligible, setIsEligible] = useState(false);
+  const [currentLocationId, setCurrentLocationId] = useState(null);
 
   // Form/Workspace State
   const [showForm, setShowForm] = useState(false);
@@ -43,12 +45,14 @@ export default function TransferRequestsCard() {
     setError(null);
     Promise.all([
       getLocations(),
+      getProfile(),
       getTransferRequests(),
       checkTransferEligibility().catch(() => ({ data: { is_eligible: false } })),
     ])
-      .then(([locationRes, transferRes, eligibilityRes]) => {
+      .then(([locationRes, profileRes, transferRes, eligibilityRes]) => {
         const rawLocations = locationRes.data || [];
         setLocations(rawLocations);
+        setCurrentLocationId(profileRes.data?.current_location_id || null);
 
         const locMap = {};
         rawLocations.forEach((loc) => {
@@ -76,7 +80,9 @@ export default function TransferRequestsCard() {
     new Set(locations.map((l) => l.state)),
   ).sort();
   const getCitiesByState = (stateName) =>
-    locations.filter((l) => l.state === stateName);
+    locations.filter(
+      (l) => l.state === stateName && l.id !== currentLocationId,
+    );
 
   const handleAddPreferenceRow = () => {
     if (selectedPreferences.length < 3) {
@@ -120,6 +126,11 @@ export default function TransferRequestsCard() {
 
     if (new Set(locationIds).size !== locationIds.length) {
       alert("Each location preference must be different.");
+      return null;
+    }
+
+    if (currentLocationId && locationIds.includes(currentLocationId)) {
+      alert("Current location cannot be included in location preferences.");
       return null;
     }
 

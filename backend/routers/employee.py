@@ -30,6 +30,14 @@ from services.transfer_service import TransferService
 
 router = APIRouter()
 
+ACTIVE_TRANSFER_STATUSES = [
+    transfer_status.PROPOSED.name,
+    transfer_status.APPEALED.name,
+    transfer_status.APPROVED.name,
+    transfer_status.SUCCESSOR_ASSIGNED.name,
+    transfer_status.HANDOVER_IN_PROGRESS.name,
+]
+
 @router.get("/locations", response_model=list[LocationResponse])
 def read_locations(db: Session = Depends(get_session)):
     locations = db.query(Location).order_by(Location.id.asc()).all()
@@ -42,7 +50,10 @@ def get_user_id(employee_id: int = Header(..., alias="employee-id")):
 
 @router.get("", response_model = EmployeeMeResponse)
 def get_profile(db : Session = Depends(get_session), current_user_id: int = Depends(get_user_id)):
-    employee = db.query(Employee).options(joinedload(Employee.discipline)).filter(Employee.id == current_user_id).first()
+    employee = db.query(Employee).options(
+        joinedload(Employee.discipline),
+        joinedload(Employee.current_position)
+    ).filter(Employee.id == current_user_id).first()
 
     if not employee: 
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -54,7 +65,8 @@ def get_profile(db : Session = Depends(get_session), current_user_id: int = Depe
         "DoB": employee.DoB,
         "DoRetirement": employee.DoRetirement,
         "domicile_state": employee.domicile_state,
-        "discipline_name": employee.discipline.name if employee.discipline else None
+        "discipline_name": employee.discipline.name if employee.discipline else None,
+        "current_location_id": employee.current_position.location_id if employee.current_position else None
     }
 
 def get_current_employee_record(
@@ -464,16 +476,9 @@ def check_voluntary_transfer_eligibility(
     db: Session = Depends(get_session),
     employee: Employee = Depends(get_current_employee_record)
 ):
-    active_statuses = [
-        transfer_status.PROPOSED.name,
-        transfer_status.APPROVED.name,
-        transfer_status.APPEALED.name,
-        transfer_status.SUCCESSOR_ASSIGNED.name,
-        transfer_status.HANDOVER_IN_PROGRESS.name
-    ]
     active_transfer = db.query(TransferRequest).filter(
         TransferRequest.employee_id == employee.id,
-        TransferRequest.status.in_(active_statuses)
+        TransferRequest.status.in_(ACTIVE_TRANSFER_STATUSES)
     ).first()
     
     if active_transfer:
@@ -503,13 +508,30 @@ def create_transfer_request(
 
     existing_request = db.query(TransferRequest).filter(
         TransferRequest.employee_id == employee.id,
-        TransferRequest.status == "PROPOSED"
+        TransferRequest.status.in_(ACTIVE_TRANSFER_STATUSES)
     ).first()
 
     if existing_request:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have a pending transfer request. Please cancel it before submitting a new one."
+            detail=f"You already have an active transfer request in '{existing_request.status}' state."
+        )
+
+    active_tenure = next((t for t in employee.tenure_records if t.end_date is None), None)
+    if not active_tenure:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have an active tenure record."
+        )
+
+    tenure_rules = TransferService._get_tenure_rules(db, employee)
+    min_tenure_years = tenure_rules.get("min_tenure_years", 3)
+    years_served = (date.today() - active_tenure.start_date).days / 365.25
+
+    if years_served < min_tenure_years:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You have not completed the minimum tenure of {min_tenure_years} years."
         )
 
     valid_locations = db.query(Location.id).filter(Location.id.in_(payload.location_preferences)).all()
@@ -519,6 +541,13 @@ def create_transfer_request(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="One or more of the provided location IDs are invalid."
+        )
+
+    current_location_id = employee.current_position.location_id if employee.current_position else None
+    if current_location_id in payload.location_preferences:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current location cannot be included in location preferences."
         )
 
     new_transfer = TransferRequest(
