@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import api from "../api/axios";
-import { revokeTransferHeadTransfer } from "../api/roleApi";
 import {
   RefreshCw,
   Play,
@@ -20,9 +19,7 @@ import {
   Hash,
   ChevronRight,
   Loader2,
-  UserCheck,
   ChevronDown,
-  Trash2,
 } from "lucide-react";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -62,7 +59,7 @@ function EmptyState({ message }) {
         <RotateCcw size={28} className="text-slate-400" />
       </div>
       <h3 className="text-base font-bold text-slate-700 mb-1">
-        No Cycle Found
+        No Cycles Found
       </h3>
       <p className="text-sm text-slate-500 max-w-sm">{message}</p>
     </div>
@@ -89,18 +86,16 @@ function Toast({ toast, onDismiss }) {
   );
 }
 
-// ─── Approved Employee Selector ───────────────────────────────────────────────
-function EmployeeSelector({ employees, selectedId, onSelect, loading }) {
+// ─── Discipline Selector ──────────────────────────────────────────────────────
+function DisciplineSelector({ disciplines, selectedId, onSelect, loading }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  const selected = employees.find((e) => e.employee_id === selectedId);
+  const selected = disciplines.find((d) => d.discipline_id === selectedId);
 
-  const filtered = employees.filter(
-    (e) =>
-      e.employee_name.toLowerCase().includes(search.toLowerCase()) ||
-      e.current_location.toLowerCase().includes(search.toLowerCase()),
+  const filtered = disciplines.filter((d) =>
+    d.discipline_name.toLowerCase().includes(search.toLowerCase()),
   );
 
   // Close dropdown on outside click
@@ -121,20 +116,21 @@ function EmployeeSelector({ employees, selectedId, onSelect, loading }) {
         className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-blue-300 hover:shadow focus:outline-none disabled:opacity-50 cursor-pointer"
       >
         <span className="flex items-center gap-2">
-          <UserCheck
+          <Users
             size={16}
             className={selected ? "text-blue-500" : "text-slate-400"}
           />
           {selected ? (
             <span>
-              {selected.employee_name}
+              {selected.discipline_name}
               <span className="ml-2 text-xs font-normal text-slate-400">
-                @ {selected.current_location}
+                {selected.count} approved employee
+                {selected.count !== 1 ? "s" : ""}
               </span>
             </span>
           ) : (
             <span className="text-slate-400 font-normal">
-              Select an approved employee…
+              Select a discipline…
             </span>
           )}
         </span>
@@ -155,7 +151,7 @@ function EmployeeSelector({ employees, selectedId, onSelect, loading }) {
               <input
                 autoFocus
                 type="text"
-                placeholder="Search name or city…"
+                placeholder="Search discipline…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-lg bg-slate-50 py-2 pl-8 pr-3 text-sm text-slate-700 outline-none placeholder-slate-400"
@@ -168,27 +164,27 @@ function EmployeeSelector({ employees, selectedId, onSelect, loading }) {
                 No results
               </li>
             ) : (
-              filtered.map((emp) => (
-                <li key={emp.employee_id}>
+              filtered.map((d) => (
+                <li key={d.discipline_id}>
                   <button
                     type="button"
                     onClick={() => {
-                      onSelect(emp.employee_id);
+                      onSelect(d.discipline_id);
                       setOpen(false);
                       setSearch("");
                     }}
-                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-blue-50 cursor-pointer ${selectedId === emp.employee_id ? "bg-blue-50" : ""}`}
+                    className={`flex w-full items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors hover:bg-blue-50 cursor-pointer ${selectedId === d.discipline_id ? "bg-blue-50" : ""}`}
                   >
                     <div>
                       <p className="font-semibold text-slate-800">
-                        {emp.employee_name}
+                        {d.discipline_name}
                       </p>
                       <p className="text-xs text-slate-500">
-                        ID {emp.employee_id} · {emp.current_location} · Lvl{" "}
-                        {emp.current_level}
+                        {d.count} approved employee
+                        {d.count !== 1 ? "s" : ""}
                       </p>
                     </div>
-                    {selectedId === emp.employee_id && (
+                    {selectedId === d.discipline_id && (
                       <CheckCircle2
                         size={16}
                         className="ml-auto text-blue-500 shrink-0"
@@ -211,13 +207,14 @@ function EmployeeSelector({ employees, selectedId, onSelect, loading }) {
 export default function TransferHeadDashboardPage() {
   const [activeTab, setActiveTab] = useState("cycle");
 
-  // Approved employee list
+  // Approved employee list (used to derive unique disciplines)
   const [approvedEmps, setApprovedEmps] = useState([]);
   const [empsLoading, setEmpsLoading] = useState(false);
 
   // Cycle state
-  const [seedId, setSeedId] = useState(null); // selected employee to anchor the cycle
-  const [cycle, setCycle] = useState(null);
+  const [selectedDisciplineId, setSelectedDisciplineId] = useState(null);
+  const [cycles, setCycles] = useState([]);
+  const [activeCycle, setActiveCycle] = useState(null); // cycle shown in confirm dialog
   const [exemptIds, setExemptIds] = useState([]);
   const [exemptNames, setExemptNames] = useState({});
   const [loading, setLoading] = useState(false);
@@ -232,6 +229,27 @@ export default function TransferHeadDashboardPage() {
 
   const [toast, setToast] = useState(null);
   const dialogRef = useRef(null);
+
+  // Derive unique disciplines from approved employees
+  const uniqueDisciplines = useMemo(() => {
+    const map = new Map();
+    approvedEmps.forEach((emp) => {
+      if (!map.has(emp.discipline_id)) {
+        map.set(emp.discipline_id, {
+          discipline_id: emp.discipline_id,
+          discipline_name:
+            emp.discipline_name ?? `Discipline #${emp.discipline_id}`,
+          count: 0,
+        });
+      }
+      map.get(emp.discipline_id).count += 1;
+    });
+    return [...map.values()];
+  }, [approvedEmps]);
+
+  const selectedDiscipline = uniqueDisciplines.find(
+    (d) => d.discipline_id === selectedDisciplineId,
+  );
 
   // Auto-dismiss toasts
   useEffect(() => {
@@ -250,40 +268,39 @@ export default function TransferHeadDashboardPage() {
       .finally(() => setEmpsLoading(false));
   }, []);
 
-  // ── Generate cycle ────────────────────────────────────────────────────
-  const generateCycle = useCallback(
-    async (ids = exemptIds, seed = seedId) => {
+  // ── Generate cycles ───────────────────────────────────────────────────
+  const generateCycles = useCallback(
+    async (ids = exemptIds, discId = selectedDisciplineId) => {
+      if (!discId) return;
       setLoading(true);
       setCycleError(null);
       try {
-        const { data } = await api.post(
-          "/transfer-head/cycle/generate",
-          {
-            exempt_employee_ids: ids,
-            seed_employee_id: seed ?? undefined,
-          },
-        );
-        setCycle(data);
+        const { data } = await api.post("/transfer-head/cycle/generate", {
+          discipline_id: discId,
+          exempt_employee_ids: ids,
+        });
+        setCycles(data);
       } catch (err) {
-        setCycle(null);
+        setCycles([]);
         setCycleError(
           err.response?.data?.detail ||
-            "No valid transfer cycle found with the given constraints.",
+            "No valid transfer cycles found for this discipline.",
         );
       } finally {
         setLoading(false);
       }
     },
-    [exemptIds, seedId],
+    [exemptIds, selectedDisciplineId],
   );
 
-  // ── Seed employee selection ───────────────────────────────────────────
-  const handleSelectSeed = (empId) => {
-    setSeedId(empId);
+  // ── Discipline selection ──────────────────────────────────────────────
+  const handleSelectDiscipline = (discId) => {
+    setSelectedDisciplineId(discId);
     setExemptIds([]);
     setExemptNames({});
-    setCycle(null);
-    generateCycle([], empId);
+    setCycles([]);
+    setActiveCycle(null);
+    generateCycles([], discId);
   };
 
   // ── Exempt / un-exempt ────────────────────────────────────────────────
@@ -291,7 +308,7 @@ export default function TransferHeadDashboardPage() {
     const next = [...exemptIds, empId];
     setExemptIds(next);
     setExemptNames((prev) => ({ ...prev, [empId]: empName }));
-    generateCycle(next, seedId);
+    generateCycles(next, selectedDisciplineId);
   };
 
   const handleUnexempt = (empId) => {
@@ -302,26 +319,26 @@ export default function TransferHeadDashboardPage() {
       delete copy[empId];
       return copy;
     });
-    generateCycle(next, seedId);
+    generateCycles(next, selectedDisciplineId);
   };
 
   // ── Execute ───────────────────────────────────────────────────────────
   const handleExecute = async () => {
-    if (!cycle) return;
+    if (!activeCycle) return;
     setExecuting(true);
     try {
       await api.post("/transfer-head/cycle/execute", {
-        steps: cycle.steps,
+        steps: activeCycle.steps,
       });
       setToast({
         type: "success",
-        message: `Cycle executed — ${cycle.steps.length} transfers completed.`,
+        message: `Cycle executed — ${activeCycle.steps.length} transfers completed.`,
       });
-      // Reset
-      setCycle(null);
-      setSeedId(null);
-      setExemptIds([]);
-      setExemptNames({});
+      // Remove the executed cycle from the list
+      setCycles((prev) =>
+        prev.filter((c) => c.cycle_id !== activeCycle.cycle_id),
+      );
+      setActiveCycle(null);
       dialogRef.current?.close();
       // Refresh approved list
       api
@@ -357,19 +374,12 @@ export default function TransferHeadDashboardPage() {
   }, [activeTab, overview, fetchOverview]);
 
   const filteredRequests = (overview?.requests || []).filter((r) => {
-    const term = searchQuery.trim().toLowerCase();
-    const matchSearch = !term || [
-      r.employee_name,
-      r.employee_id,
-      r.discipline,
-      r.current_location,
-      ...(r.preferred_cities || []),
-    ].some((val) => String(val || "").toLowerCase().includes(term));
+    const matchName = r.employee_name
+      ?.toLowerCase()
+      .includes(searchQuery.toLowerCase());
     const matchStatus = statusFilter === "ALL" || r.status === statusFilter;
-    return matchSearch && matchStatus;
+    return matchName && matchStatus;
   });
-
-  const seedEmployee = approvedEmps.find((e) => e.employee_id === seedId);
 
   // ─────────────────────────────────────────────────────────────────────
   return (
@@ -380,8 +390,8 @@ export default function TransferHeadDashboardPage() {
           Transfer Head Workspace
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Select an approved employee, inspect the optimal transfer cycle they
-          belong to, exempt participants, and execute atomically.
+          Select a discipline, inspect all optimal non-overlapping transfer
+          cycles, exempt participants, and execute atomically.
         </p>
       </div>
 
@@ -408,119 +418,185 @@ export default function TransferHeadDashboardPage() {
       {/* ═══════════════════════════════════════════════════════════════ */}
       {activeTab === "cycle" && (
         <div className="space-y-5">
-          {/* ── Step 1: Approved employee selector ─────────────────── */}
+          {/* ── Step 1: Discipline selector ──────────────────────────── */}
           <div className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 p-6 space-y-4">
             <div className="flex items-center gap-2 mb-1">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
-                <UserCheck size={15} className="text-blue-500" />
+                <Users size={15} className="text-blue-500" />
               </div>
               <h2 className="text-sm font-bold text-slate-700">
-                Choose a starting employee
+                Choose a discipline
               </h2>
               <span className="ml-auto text-xs text-slate-400">
-                {approvedEmps.length} approved employees
+                {uniqueDisciplines.length} discipline
+                {uniqueDisciplines.length !== 1 ? "s" : ""} with approved
+                employees
               </span>
             </div>
 
             <p className="text-xs text-slate-500">
-              Select any employee from the approved transfer list. The engine
-              will find the best closed cycle that includes them.
+              Select a discipline from the approved transfer list. The engine
+              will find all optimal non-overlapping transfer cycles for it.
             </p>
 
-            <EmployeeSelector
-              employees={approvedEmps}
-              selectedId={seedId}
-              onSelect={handleSelectSeed}
+            <DisciplineSelector
+              disciplines={uniqueDisciplines}
+              selectedId={selectedDisciplineId}
+              onSelect={handleSelectDiscipline}
               loading={empsLoading}
             />
 
-            {seedEmployee && (
+            {selectedDiscipline && (
               <div className="rounded-lg bg-blue-50 border border-blue-100 px-4 py-2.5 flex items-center gap-3 text-xs">
-                <MapPin size={13} className="text-blue-400 shrink-0" />
+                <Zap size={13} className="text-blue-400 shrink-0" />
                 <span className="text-blue-700">
-                  Finding best cycle for{" "}
-                  <strong>{seedEmployee.employee_name}</strong> currently at{" "}
-                  <strong>{seedEmployee.current_location}</strong> (Level{" "}
-                  {seedEmployee.current_level})
+                  Finding optimal cycles for{" "}
+                  <strong>{selectedDiscipline.discipline_name}</strong> (
+                  {selectedDiscipline.count} approved employee
+                  {selectedDiscipline.count !== 1 ? "s" : ""})
                 </span>
               </div>
             )}
           </div>
 
-          {/* ── Step 2: Cycle result ────────────────────────────────── */}
-          {seedId && (
-            <div className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 p-6 space-y-5">
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50">
-                  <RotateCcw size={15} className="text-violet-500" />
+          {/* ── Step 2: Cycle results ────────────────────────────────── */}
+          {selectedDisciplineId && (
+            <div className="space-y-4">
+              {/* Section header + Regenerate */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-50">
+                    <RotateCcw size={15} className="text-violet-500" />
+                  </div>
+                  <h2 className="text-sm font-bold text-slate-700">
+                    Optimal Cycles
+                    {!loading && cycles.length > 0 && (
+                      <span className="ml-2 text-xs font-normal text-slate-400">
+                        {cycles.length} cycle{cycles.length !== 1 ? "s" : ""}{" "}
+                        found
+                      </span>
+                    )}
+                  </h2>
                 </div>
-                <h2 className="text-sm font-bold text-slate-700">
-                  Review the optimal cycle
-                </h2>
+                <button
+                  type="button"
+                  onClick={() =>
+                    generateCycles(exemptIds, selectedDisciplineId)
+                  }
+                  disabled={loading}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm transition-all hover:bg-slate-50 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw
+                    size={15}
+                    className={loading ? "animate-spin" : ""}
+                  />
+                  Regenerate
+                </button>
               </div>
 
+              {/* Exempt pills */}
+              {exemptIds.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Exempted from cycles:
+                  </span>
+                  {exemptIds.map((eid) => (
+                    <span
+                      key={eid}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700"
+                    >
+                      {exemptNames[eid] || `#${eid}`}
+                      <span className="text-[10px] text-rose-400">
+                        (stays approved)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleUnexempt(eid)}
+                        className="rounded-full p-0.5 hover:bg-rose-200/60 cursor-pointer"
+                      >
+                        <X size={11} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Loading / Error / Cycle cards */}
               {loading ? (
                 <CycleSkeleton />
               ) : cycleError ? (
-                <EmptyState message={cycleError} />
-              ) : cycle ? (
-                <div className="space-y-5">
-                  {/* Metric cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
-                        <Hash size={16} className="text-blue-600" />
+                <div className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 p-6">
+                  <EmptyState message={cycleError} />
+                </div>
+              ) : cycles.length > 0 ? (
+                <div className="space-y-4">
+                  {cycles.map((cycle, cycleIdx) => (
+                    <div
+                      key={cycle.cycle_id}
+                      className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 p-6 space-y-5"
+                    >
+                      {/* Cycle header */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-100">
+                          <span className="text-xs font-extrabold text-violet-600">
+                            {cycleIdx + 1}
+                          </span>
+                        </div>
+                        <h3 className="text-sm font-bold text-slate-700">
+                          Cycle {cycleIdx + 1}
+                          <span className="ml-1 text-xs font-normal text-slate-400">
+                            of {cycles.length}
+                          </span>
+                        </h3>
                       </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Cycle Length
-                        </p>
-                        <p className="text-lg font-extrabold text-slate-800">
-                          {cycle.cycle_length}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
-                        <TrendingUp size={16} className="text-emerald-600" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                          Avg Match Score
-                        </p>
-                        <p className="text-lg font-extrabold text-slate-800">
-                          {(cycle.overall_score * 100).toFixed(1)}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  {/* Flow visualizer */}
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-                      <RotateCcw size={12} />
-                      Transfer Flow (hover for exempt button)
-                    </p>
-                    <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2 snap-x">
-                      {cycle.steps.map((step, idx) => {
-                        const isSeed = step.from_employee_id === seedId;
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 snap-start"
-                          >
+                      {/* Metric cards */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100">
+                            <Hash size={16} className="text-blue-600" />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Cycle Length
+                            </p>
+                            <p className="text-lg font-extrabold text-slate-800">
+                              {cycle.cycle_length}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 rounded-xl bg-slate-50 border border-slate-100 px-4 py-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-100">
+                            <TrendingUp
+                              size={16}
+                              className="text-emerald-600"
+                            />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                              Avg Match Score
+                            </p>
+                            <p className="text-lg font-extrabold text-slate-800">
+                              {(cycle.overall_score * 100).toFixed(1)}%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Flow visualizer */}
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                          <RotateCcw size={12} />
+                          Transfer Flow (hover for exempt button)
+                        </p>
+                        <div className="flex flex-nowrap gap-2 overflow-x-auto pb-2 snap-x">
+                          {cycle.steps.map((step, idx) => (
                             <div
-                              className={`min-w-[240px] rounded-xl border p-4 shadow-sm transition-all duration-200 hover:shadow-md group relative ${isSeed ? "border-blue-300 bg-blue-50/60" : "border-slate-200 bg-white hover:border-blue-200"}`}
+                              key={idx}
+                              className="flex items-center gap-2 snap-start"
                             >
-                              {/* Seed badge */}
-                              {isSeed && (
-                                <span className="absolute -top-2 left-3 bg-blue-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-widest">
-                                  Selected
-                                </span>
-                              )}
-
-                              {/* Exempt button */}
-                              {!isSeed && (
+                              <div className="min-w-[240px] rounded-xl border border-slate-200 bg-white hover:border-blue-200 p-4 shadow-sm transition-all duration-200 hover:shadow-md group relative">
+                                {/* Exempt button */}
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -530,124 +606,85 @@ export default function TransferHeadDashboardPage() {
                                     )
                                   }
                                   className="absolute top-2 right-2 rounded-lg p-1.5 text-slate-300 opacity-0 group-hover:opacity-100 hover:bg-rose-50 hover:text-rose-500 transition-all duration-150 cursor-pointer"
-                                  title="Exempt from this cycle"
+                                  title="Exempt from cycles"
                                 >
                                   <Shield size={13} />
                                 </button>
-                              )}
 
-                              <p className="text-sm font-bold text-slate-800 pr-7 truncate">
-                                {step.from_employee_name}
-                              </p>
+                                <p className="text-sm font-bold text-slate-800 pr-7 truncate">
+                                  {step.from_employee_name}
+                                </p>
 
-                              <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
-                                <MapPin size={11} />
-                                <span>{step.from_location}</span>
-                                <ArrowRight
-                                  size={11}
-                                  className="text-blue-400 mx-0.5"
+                                <div className="flex items-center gap-1 mt-1.5 text-xs text-slate-500">
+                                  <MapPin size={11} />
+                                  <span>{step.from_location}</span>
+                                  <ArrowRight
+                                    size={11}
+                                    className="text-blue-400 mx-0.5"
+                                  />
+                                  <span className="text-blue-600 font-medium">
+                                    {step.to_location}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center gap-2 mt-2.5">
+                                  <span
+                                    className={`text-xs font-bold px-2 py-0.5 rounded-md border ${scoreBadge(step.match_score)}`}
+                                  >
+                                    {(step.match_score * 100).toFixed(0)}% match
+                                  </span>
+                                </div>
+                              </div>
+
+                              {idx < cycle.steps.length - 1 ? (
+                                <ChevronRight
+                                  size={18}
+                                  className="text-slate-300 shrink-0"
                                 />
-                                <span className="text-blue-600 font-medium">
-                                  {step.to_location}
-                                </span>
-                              </div>
-
-                              <div className="flex items-center gap-2 mt-2.5">
-                                <span
-                                  className={`text-xs font-bold px-2 py-0.5 rounded-md border ${scoreBadge(step.match_score)}`}
-                                >
-                                  {(step.match_score * 100).toFixed(0)}% match
-                                </span>
-                                <span className="text-xs text-slate-400 flex items-center gap-1">
-                                  <Clock size={10} />
-                                  {step.tenure_years}y
-                                </span>
-                              </div>
+                              ) : (
+                                <div className="flex flex-col items-center gap-0.5 shrink-0 text-blue-400 px-1">
+                                  <RotateCcw size={14} />
+                                  <span className="text-[9px] font-bold uppercase tracking-widest">
+                                    loop
+                                  </span>
+                                </div>
+                              )}
                             </div>
+                          ))}
+                        </div>
+                      </div>
 
-                            {idx < cycle.steps.length - 1 ? (
-                              <ChevronRight
-                                size={18}
-                                className="text-slate-300 shrink-0"
-                              />
-                            ) : (
-                              <div className="flex flex-col items-center gap-0.5 shrink-0 text-blue-400 px-1">
-                                <RotateCcw size={14} />
-                                <span className="text-[9px] font-bold uppercase tracking-widest">
-                                  loop
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Exempt pills */}
-                  {exemptIds.length > 0 && (
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                        Exempted from this cycle:
-                      </span>
-                      {exemptIds.map((eid) => (
-                        <span
-                          key={eid}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-semibold text-rose-700"
+                      {/* Execute this cycle */}
+                      <div className="flex justify-end pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveCycle(cycle);
+                            dialogRef.current?.showModal();
+                          }}
+                          className="flex items-center gap-2 rounded-xl bg-[#3b82f6] px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-blue-200 transition-all hover:bg-[#2563eb] hover:shadow-md cursor-pointer"
                         >
-                          {exemptNames[eid] || `#${eid}`}
-                          <span className="text-[10px] text-rose-400">
-                            (stays approved)
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleUnexempt(eid)}
-                            className="rounded-full p-0.5 hover:bg-rose-200/60 cursor-pointer"
-                          >
-                            <X size={11} />
-                          </button>
-                        </span>
-                      ))}
+                          <Play size={15} />
+                          Execute Cycle
+                        </button>
+                      </div>
                     </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex gap-3 pt-1 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => generateCycle(exemptIds, seedId)}
-                      disabled={loading}
-                      className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-600 shadow-sm transition-all hover:bg-slate-50 cursor-pointer disabled:opacity-50"
-                    >
-                      <RefreshCw
-                        size={15}
-                        className={loading ? "animate-spin" : ""}
-                      />
-                      Regenerate
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => dialogRef.current?.showModal()}
-                      className="flex items-center gap-2 rounded-xl bg-[#3b82f6] px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-blue-200 transition-all hover:bg-[#2563eb] hover:shadow-md cursor-pointer"
-                    >
-                      <Play size={15} />
-                      Execute Cycle
-                    </button>
-                  </div>
+                  ))}
                 </div>
               ) : null}
             </div>
           )}
 
-          {/* Placeholder when no employee selected yet */}
-          {!seedId && (
+          {/* Placeholder when no discipline selected yet */}
+          {!selectedDisciplineId && (
             <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/50 py-20 text-center">
-              <UserCheck size={36} className="text-slate-300 mb-4" />
+              <Users size={36} className="text-slate-300 mb-4" />
               <p className="text-sm font-semibold text-slate-500">
-                Select an approved employee above
+                Select a discipline above
               </p>
               <p className="text-xs text-slate-400 mt-1">
-                The engine will find the optimal transfer cycle including them
+                The engine will find all optimal transfer cycles for that
+                discipline
               </p>
             </div>
           )}
@@ -727,12 +764,12 @@ export default function TransferHeadDashboardPage() {
               <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={15}
+                    className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
                   />
                   <input
-                    type="search"
-                    placeholder="Search by name, ID, discipline, department, or location"
+                    type="text"
+                    placeholder="Search by employee name…"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-4 py-2.5 text-sm text-slate-700 placeholder-slate-400 outline-none focus:border-blue-300 focus:ring-2 focus:ring-blue-50 transition-all"
@@ -750,16 +787,16 @@ export default function TransferHeadDashboardPage() {
                 </select>
               </div>
 
-              {/* Table Container */}
+              {/* Table */}
               <div className="bg-white rounded-2xl shadow-xl shadow-slate-100 border border-slate-100 overflow-hidden">
                 {filteredRequests.length === 0 ? (
                   <p className="py-14 text-center text-sm text-slate-400">
                     No matching requests found.
                   </p>
                 ) : (
-                  <div className="max-h-[28rem] overflow-y-auto">
+                  <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                      <thead>
                         <tr className="border-b border-slate-100 bg-slate-50/60">
                           {[
                             "Employee",
@@ -769,13 +806,10 @@ export default function TransferHeadDashboardPage() {
                             "Location",
                             "Preferred Cities",
                             "Created",
-                            "Actions",
                           ].map((h) => (
                             <th
                               key={h}
-                              className={`px-5 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider ${
-                                h === "Actions" ? "text-right" : "text-left"
-                              }`}
+                              className="px-5 py-3.5 text-left text-xs font-bold text-slate-500 uppercase tracking-wider"
                             >
                               {h}
                             </th>
@@ -794,8 +828,8 @@ export default function TransferHeadDashboardPage() {
                             <td className="px-5 py-3.5 text-slate-500 font-mono text-xs">
                               {r.employee_id}
                             </td>
-                            <td className="px-5 py-3.5 text-slate-600 font-medium">
-                              {r.discipline || "Unassigned"}
+                            <td className="px-5 py-3.5 text-slate-600 whitespace-nowrap">
+                              {r.discipline_name || "—"}
                             </td>
                             <td className="px-5 py-3.5">
                               <span
@@ -814,41 +848,6 @@ export default function TransferHeadDashboardPage() {
                               {r.created_at
                                 ? new Date(r.created_at).toLocaleDateString()
                                 : "—"}
-                            </td>
-                            <td className="px-5 py-3.5 text-right whitespace-nowrap">
-                              {r.status === "PROPOSED" && r.is_th_initiated ? (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    if (
-                                      window.confirm(
-                                        `Are you sure you want to revoke the proposed transfer for ${r.employee_name}?`
-                                      )
-                                    ) {
-                                      try {
-                                        await revokeTransferHeadTransfer(r.request_id);
-                                        setToast({
-                                          type: "success",
-                                          message: "Transfer request revoked successfully.",
-                                        });
-                                        fetchOverview();
-                                      } catch (err) {
-                                        setToast({
-                                          type: "error",
-                                          message:
-                                            err.response?.data?.detail ||
-                                            "Failed to revoke transfer.",
-                                        });
-                                      }
-                                    }
-                                  }}
-                                  className="inline-flex items-center gap-1 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
-                                >
-                                  <Trash2 size={13} /> Revoke
-                                </button>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">N/A</span>
-                              )}
                             </td>
                           </tr>
                         ))}
@@ -881,13 +880,13 @@ export default function TransferHeadDashboardPage() {
                 Confirm Cycle Execution
               </h3>
               <p className="text-xs text-slate-400">
-                {cycle?.cycle_length}-employee transfer loop
+                {activeCycle?.cycle_length}-employee transfer loop
               </p>
             </div>
           </div>
 
           <div className="rounded-lg bg-slate-50 border border-slate-100 px-4 py-3 space-y-1.5">
-            {cycle?.steps?.map((s, i) => (
+            {activeCycle?.steps?.map((s, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="font-semibold text-slate-700 w-5 text-right">
                   {i + 1}.
