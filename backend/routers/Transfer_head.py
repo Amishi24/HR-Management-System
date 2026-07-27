@@ -57,9 +57,9 @@ def get_current_transfer_head(
 # ── Request / Response Schemas ───────────────────────────────────────────
 
 class CycleGenerateRequest(BaseModel):
+    discipline_id: int
     exempt_employee_ids: List[int] = []
     max_cycle_length: int = 5
-    seed_employee_id: int | None = None
 
 
 class CycleExecuteRequest(BaseModel):
@@ -79,19 +79,19 @@ def generate_cycle(
     req: CycleGenerateRequest,
     db: Session = Depends(get_session),
 ):
-    """Generate the single best transfer cycle, honouring exemptions."""
-    result = CycleEngineService.get_optimal_transfer_cycle(
+    """Generate all optimal non-overlapping transfer cycles for a discipline."""
+    cycles = CycleEngineService.get_optimal_transfer_cycles_for_discipline(
         db,
+        discipline_id=req.discipline_id,
         exempt_employee_ids=req.exempt_employee_ids,
         max_cycle_length=req.max_cycle_length,
-        seed_employee_id=req.seed_employee_id,
     )
-    if result is None:
+    if not cycles:
         raise HTTPException(
             status_code=404,
-            detail="No valid transfer cycle found with the given constraints.",
+            detail="No valid transfer cycles found for this discipline.",
         )
-    return result
+    return cycles
 
 
 @router.post("/cycle/execute")
@@ -127,6 +127,8 @@ def requests_overview(db: Session = Depends(get_session)):
             joinedload(TransferRequest.employee)
             .joinedload(Employee.current_position)
             .joinedload(Positions.location),
+            joinedload(TransferRequest.employee)
+            .joinedload(Employee.discipline),
         )
         .where(TransferRequest.status.in_(active_statuses))
         .order_by(TransferRequest.created_at.desc())
@@ -164,6 +166,7 @@ def requests_overview(db: Session = Depends(get_session)):
             "request_id": req.id,
             "employee_id": emp.id if emp else None,
             "employee_name": emp.name if emp else "Unknown",
+            "discipline_name": emp.discipline.name if emp and emp.discipline else "Unknown",
             "status": req.status,
             "current_location": current_city,
             "location_preferences": pref_ids,
