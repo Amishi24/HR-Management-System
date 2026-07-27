@@ -13,7 +13,11 @@ import {
 } from "../../api/employeeApi";
 
 const PORTAL_INITIATED_TEXT = "Initiated by employee via self-service portal.";
-const TERMINAL_TRANSFER_STATUSES = new Set(["COMPLETED", "CANCELLED", "REJECTED"]);
+const TERMINAL_TRANSFER_STATUSES = new Set([
+  "COMPLETED",
+  "CANCELLED",
+  "REJECTED",
+]);
 
 export default function TransferRequestsCard() {
   const [transfers, setTransfers] = useState([]);
@@ -47,7 +51,9 @@ export default function TransferRequestsCard() {
       getLocations(),
       getProfile(),
       getTransferRequests(),
-      checkTransferEligibility().catch(() => ({ data: { is_eligible: false } })),
+      checkTransferEligibility().catch(() => ({
+        data: { is_eligible: false },
+      })),
     ])
       .then(([locationRes, profileRes, transferRes, eligibilityRes]) => {
         const rawLocations = locationRes.data || [];
@@ -172,9 +178,7 @@ export default function TransferRequestsCard() {
       setTimeout(() => setActionMessage(""), 4000);
     } catch (err) {
       console.error(err);
-      alert(
-        err.response?.data?.detail || "Failed to accept transfer request.",
-      );
+      alert(err.response?.data?.detail || "Failed to accept transfer request.");
     } finally {
       setSubmittingAction(false);
     }
@@ -212,7 +216,9 @@ export default function TransferRequestsCard() {
         appeal_notes: appealNotes,
         location_preferences: finalCityIds,
       });
-      setActionMessage("Transfer appeal and preferences submitted successfully!");
+      setActionMessage(
+        "Transfer appeal and preferences submitted successfully!",
+      );
       setAppealingTransfer(null);
       setAppealNotes("");
       refreshData();
@@ -593,7 +599,8 @@ export default function TransferRequestsCard() {
                 Decline & Appeal Transfer
               </h3>
               <p className="text-xs text-slate-500">
-                Provide medical or educational grounds and submit your preferred locations for future consideration.
+                Provide medical or educational grounds and submit your preferred
+                locations for future consideration.
               </p>
             </div>
             <button
@@ -733,7 +740,9 @@ export default function TransferRequestsCard() {
                 className="px-5 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700 cursor-pointer disabled:opacity-60 shadow-sm hover:shadow"
                 disabled={submittingAction}
               >
-                {submittingAction ? "Submitting..." : "Submit Appeal & Preferences"}
+                {submittingAction
+                  ? "Submitting..."
+                  : "Submit Appeal & Preferences"}
               </button>
             </div>
           </form>
