@@ -41,7 +41,7 @@ const roleConfigs = {
   MED_OFFICER: {
     personalBasePath: null,
     managerBasePath: "/med-officer/manager",
-    managerLabel: "Medical Appeals Workspace",
+    managerLabel: "Medical Officer Workspace",
     managerIcon: Stethoscope,
   },
 };
@@ -141,6 +141,12 @@ const getNavigationItems = (role, view) => {
           to: "/transfer-head/manager/initiate-transfer",
         },
         {
+          key: "voluntary-requests",
+          label: "Voluntary Requests",
+          icon: UserCircle2,
+          to: "/transfer-head/manager/voluntary-requests",
+        },
+        {
           key: "appeals-dashboard",
           label: "Appeals Dashboard",
           icon: GraduationCap,
@@ -152,8 +158,8 @@ const getNavigationItems = (role, view) => {
     if (role === "MED_OFFICER") {
       return [
         {
-          key: "appeals-dashboard",
-          label: "Appeals Dashboard",
+          key: "medical-review",
+          label: "Medical Review",
           icon: Stethoscope,
           to: "/med-officer/manager/dashboard",
         },

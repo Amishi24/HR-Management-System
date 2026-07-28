@@ -15,15 +15,12 @@ class NLPModelManager:
         return cls._instance
 
     def __init__(self):
-        if NLPModelManager._model is None:
-            NLPModelManager._model = SentenceTransformer("all-MiniLM-L6-v2")
+        pass
 
     def get_model(self) -> SentenceTransformer:
-        return self._model
-
-
-# Load the model exactly once when the module loads
-nlp_model_manager = NLPModelManager()
+        if NLPModelManager._model is None:
+            NLPModelManager._model = SentenceTransformer("all-MiniLM-L6-v2")
+        return NLPModelManager._model
 
 
 class MatchingService:

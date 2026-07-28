@@ -80,6 +80,10 @@ export const appealTransferRequest = (transferId, data) => {
     return api.patch(`/me/transfers/${transferId}/appeal`, data);
 };
 
-export const updateTransferPreferences = (transferId, data) => {
-    return api.patch(`/me/transfers/${transferId}/preferences`, data);
+export const checkTransferEligibility = () => {
+    return api.get("/me/transfers/eligibility");
+};
+
+export const acceptTransfer = (transferId, data) => {
+    return api.patch(`/me/transfers/${transferId}/accept`, data);
 };

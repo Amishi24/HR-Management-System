@@ -22,10 +22,21 @@ from schemas import (
     TransferResponse,
     TransferCreate,
     LocationResponse,
-    TransferAppealPayload
+    TransferAppealPayload,
+    TransferAcceptPayload,
+    VoluntaryEligibilityResponse
 )
+from services.transfer_service import TransferService
 
 router = APIRouter()
+
+ACTIVE_TRANSFER_STATUSES = [
+    transfer_status.PROPOSED.name,
+    transfer_status.APPEALED.name,
+    transfer_status.APPROVED.name,
+    transfer_status.SUCCESSOR_ASSIGNED.name,
+    transfer_status.HANDOVER_IN_PROGRESS.name,
+]
 
 @router.get("/locations", response_model=list[LocationResponse])
 def read_locations(db: Session = Depends(get_session)):
@@ -39,7 +50,10 @@ def get_user_id(employee_id: int = Header(..., alias="employee-id")):
 
 @router.get("", response_model = EmployeeMeResponse)
 def get_profile(db : Session = Depends(get_session), current_user_id: int = Depends(get_user_id)):
-    employee = db.query(Employee).options(joinedload(Employee.discipline)).filter(Employee.id == current_user_id).first()
+    employee = db.query(Employee).options(
+        joinedload(Employee.discipline),
+        joinedload(Employee.current_position)
+    ).filter(Employee.id == current_user_id).first()
 
     if not employee: 
         raise HTTPException(status_code=404, detail="Employee not found")
@@ -51,7 +65,8 @@ def get_profile(db : Session = Depends(get_session), current_user_id: int = Depe
         "DoB": employee.DoB,
         "DoRetirement": employee.DoRetirement,
         "domicile_state": employee.domicile_state,
-        "discipline_name": employee.discipline.name if employee.discipline else None
+        "discipline_name": employee.discipline.name if employee.discipline else None,
+        "current_location_id": employee.current_position.location_id if employee.current_position else None
     }
 
 def get_current_employee_record(
@@ -400,6 +415,12 @@ def update_my_medical_records(
             status_code = status.HTTP_404_NOT_FOUND,
             detail = "medicalRecord not found or access denied"
         )
+
+    if record.is_approve:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Approved medical records cannot be modified."
+        )
     
     if payload.issue is not None:
         record.issue = payload.issue
@@ -425,6 +446,12 @@ def delete_my_record(
             status_code = status.HTTP_404_NOT_FOUND,
             detail = "medicalRecord not found or access denied"
         )
+
+    if record.is_approve:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Approved medical records cannot be deleted."
+        )
     
     db.delete(record)
     db.commit()
@@ -444,6 +471,34 @@ def get_my_transfers(
     return transfers
 
 
+@router.get("/transfers/eligibility", response_model=VoluntaryEligibilityResponse)
+def check_voluntary_transfer_eligibility(
+    db: Session = Depends(get_session),
+    employee: Employee = Depends(get_current_employee_record)
+):
+    active_transfer = db.query(TransferRequest).filter(
+        TransferRequest.employee_id == employee.id,
+        TransferRequest.status.in_(ACTIVE_TRANSFER_STATUSES)
+    ).first()
+    
+    if active_transfer:
+        return {"is_eligible": False, "message": "You already have an active transfer request."}
+        
+    active_tenure = next((t for t in employee.tenure_records if t.end_date is None), None)
+    if not active_tenure:
+        return {"is_eligible": False, "message": "You do not have an active tenure record."}
+        
+    tenure_rules = TransferService._get_tenure_rules(db, employee)
+    min_tenure_years = tenure_rules.get('min_tenure_years', 3)
+    
+    days_served = (date.today() - active_tenure.start_date).days
+    years_served = days_served / 365.25
+    
+    if years_served >= min_tenure_years:
+        return {"is_eligible": True, "message": "You are eligible to submit a voluntary transfer request."}
+    else:
+        return {"is_eligible": False, "message": f"You have not completed the minimum tenure of {min_tenure_years} years."}
+
 @router.post("/transfers", status_code=status.HTTP_201_CREATED)
 def create_transfer_request(
     payload: TransferCreate,
@@ -453,13 +508,30 @@ def create_transfer_request(
 
     existing_request = db.query(TransferRequest).filter(
         TransferRequest.employee_id == employee.id,
-        TransferRequest.status == "PROPOSED"
+        TransferRequest.status.in_(ACTIVE_TRANSFER_STATUSES)
     ).first()
 
     if existing_request:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You already have a pending transfer request. Please cancel it before submitting a new one."
+            detail=f"You already have an active transfer request in '{existing_request.status}' state."
+        )
+
+    active_tenure = next((t for t in employee.tenure_records if t.end_date is None), None)
+    if not active_tenure:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have an active tenure record."
+        )
+
+    tenure_rules = TransferService._get_tenure_rules(db, employee)
+    min_tenure_years = tenure_rules.get("min_tenure_years", 3)
+    years_served = (date.today() - active_tenure.start_date).days / 365.25
+
+    if years_served < min_tenure_years:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"You have not completed the minimum tenure of {min_tenure_years} years."
         )
 
     valid_locations = db.query(Location.id).filter(Location.id.in_(payload.location_preferences)).all()
@@ -469,6 +541,13 @@ def create_transfer_request(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="One or more of the provided location IDs are invalid."
+        )
+
+    current_location_id = employee.current_position.location_id if employee.current_position else None
+    if current_location_id in payload.location_preferences:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current location cannot be included in location preferences."
         )
 
     new_transfer = TransferRequest(
@@ -518,46 +597,37 @@ def appeal_mandatory_transfer(
         if not has_board_child:
             raise HTTPException(status_code=400, detail="No dependent children currently registered in 9th or 11th class.")
 
+    valid_locations = db.query(Location.id).filter(Location.id.in_(payload.location_preferences)).all()
+    if len(valid_locations) != len(payload.location_preferences):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more of the provided location IDs are invalid."
+        )
 
+    transfer.location_preferences = payload.location_preferences
     transfer.status = transfer_status.APPEALED.name
     
     current_notes = transfer.audit_notes or ""
     today_str = date.today().isoformat()
-    transfer.audit_notes = f"{current_notes} | [Employee Appealed ({payload.appeal_type}) - {today_str}]: {payload.appeal_notes}"
+    transfer.audit_notes = f"{current_notes} | [Employee Appealed ({payload.appeal_type}) - {today_str}]: {payload.appeal_notes} | Preferences submitted."
 
     db.commit()
-    return {"message": "Transfer appeal submitted successfully. Awaiting Department Head review."}
+    return {"message": "Transfer appeal and preferences submitted successfully. Awaiting review."}
 
-
-@router.patch("/transfers/{transfer_id}/preferences")
-def submit_transfer_preferences(
+@router.patch("/transfers/{transfer_id}/accept")
+def accept_proposed_transfer(
     transfer_id: int,
-    payload: TransferCreate,
+    payload: TransferAcceptPayload,
     db: Session = Depends(get_session),
     employee: Employee = Depends(get_current_employee_record)
 ):
-
     transfer = db.query(TransferRequest).filter(
         TransferRequest.id == transfer_id,
         TransferRequest.employee_id == employee.id
     ).first()
 
-    if not transfer:
-        raise HTTPException(status_code=404, detail="Transfer request not found.")
-
-
-    if transfer.status != transfer_status.PROPOSED.name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Cannot update preferences for a transfer that is already being processed."
-        )
-
-    if len(transfer.location_preferences) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, 
-            detail="Preferences have already been submitted for this transfer request."
-        )
-
+    if not transfer or transfer.status != transfer_status.PROPOSED.name:
+        raise HTTPException(status_code=400, detail="Transfer not found or not in PROPOSED state.")
 
     valid_locations = db.query(Location.id).filter(Location.id.in_(payload.location_preferences)).all()
     if len(valid_locations) != len(payload.location_preferences):
@@ -567,13 +637,17 @@ def submit_transfer_preferences(
         )
 
     transfer.location_preferences = payload.location_preferences
+    transfer.status = transfer_status.APPROVED.name
     
     current_notes = transfer.audit_notes or ""
-    transfer.audit_notes = f"{current_notes} | Locations submitted/updated by employee on {date.today()}."
+    today_str = date.today().isoformat()
+    transfer.audit_notes = f"{current_notes} | [Employee ACCEPTED - {today_str}]: Preferences submitted."
     
     db.commit()
-    
-    return {"message": "Location preferences submitted successfully."}
+    return {"message": "Transfer accepted and preferences submitted successfully."}
+
+
+
 
 
 

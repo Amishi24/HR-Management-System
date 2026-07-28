@@ -193,9 +193,9 @@ export default function TransferHeadAppealsDashboard() {
               No educational appeals match your filters.
             </div>
           ) : (
-            <div className="max-h-96 overflow-y-auto rounded-2xl border border-slate-200">
+            <div className="max-h-[24rem] overflow-y-auto rounded-2xl border border-slate-200">
               <table className="min-w-full divide-y divide-slate-200 text-sm">
-                <thead className="sticky top-0 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500">
+                <thead className="sticky top-0 bg-slate-50 text-left text-xs font-bold uppercase tracking-wide text-slate-500 z-10">
                   <tr>
                     <th className="px-4 py-3">Employee</th>
                     <th className="px-4 py-3">Department</th>
@@ -211,7 +211,7 @@ export default function TransferHeadAppealsDashboard() {
                     return (
                       <tr
                         key={appeal.id}
-                        className={selected ? "bg-blue-50" : undefined}
+                        className={selected ? "bg-blue-50 font-medium" : undefined}
                       >
                         <td className="px-4 py-3">
                           <p className="font-semibold text-slate-800">
@@ -243,7 +243,7 @@ export default function TransferHeadAppealsDashboard() {
                             type="button"
                             onClick={() => handleSelectAppeal(appeal.id)}
                             disabled={contextLoading && selected}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60 cursor-pointer"
                           >
                             {contextLoading && selected ? (
                               <Loader2 size={15} className="animate-spin" />
@@ -267,15 +267,17 @@ export default function TransferHeadAppealsDashboard() {
         <div className="rounded-3xl border border-slate-200 bg-slate-50 p-8 text-center text-sm text-slate-500">
           Loading appeal context...
         </div>
-      ) : (
-        <AppealReview
-          appealContext={appealContext}
-          submitting={submitting}
-          reviewNotes={reviewNotes}
-          onReviewNotesChange={handleReviewNotesChange}
-          onAppealDecision={handleAppealDecision}
-        />
-      )}
+      ) : appealContext ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm space-y-4 max-h-[30rem] overflow-y-auto">
+          <AppealReview
+            appealContext={appealContext}
+            submitting={submitting}
+            reviewNotes={reviewNotes}
+            onReviewNotesChange={handleReviewNotesChange}
+            onAppealDecision={handleAppealDecision}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

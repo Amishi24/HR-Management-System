@@ -78,3 +78,19 @@ export const decideTransferHeadAppeal = (transferId, payload) =>
   api.patch(`/transfer-head/transfers/${transferId}/appeal-decision`, payload);
 export const revokeTransferHeadTransfer = (transferId) =>
   api.delete(`/transfer-head/transfers/${transferId}`);
+export const getTransferHeadVoluntaryTransfers = () =>
+  api.get("/transfer-head/transfers/voluntary");
+export const approveTransferHeadVoluntaryTransfer = (transferId) =>
+  api.patch(`/transfer-head/transfers/${transferId}/approve-voluntary`);
+export const getTransferHeadEmployeeDetails = (employeeId) =>
+  api.get(`/transfer-head/employees/${employeeId}`);
+
+export const getMedicalOfficerRecords = () =>
+  api.get("/med-officer/medical-records");
+export const decideMedicalOfficerRecord = (medicalId, payload) =>
+  api.patch(`/med-officer/medical-records/${medicalId}/approval`, payload);
+export const getMedicalOfficerAppeals = () => api.get("/med-officer/transfers");
+export const getMedicalOfficerAppealContext = (transferId) =>
+  api.get(`/med-officer/transfers/${transferId}/context`);
+export const decideMedicalOfficerAppeal = (transferId, payload) =>
+  api.patch(`/med-officer/transfers/${transferId}/appeal-decision`, payload);

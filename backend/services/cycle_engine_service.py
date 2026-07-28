@@ -7,7 +7,7 @@ Greedy Selection algorithm prioritized strictly by NLP match scores.
 """
 
 import uuid
-from typing import List, Optional, Dict, Set, Tuple
+from typing import List, Dict, Set, Tuple
 from datetime import date
 
 from sqlalchemy.orm import Session, joinedload
@@ -34,16 +34,15 @@ class CycleEngineService:
         Can be filtered by discipline for the Transfer Head's overview.
         """
         approved_status = transfer_status.APPROVED.name
-        stmt = select(Employee).options(
-            joinedload(Employee.current_position).joinedload(Positions.location),
-            joinedload(Employee.transfer_requests),
-            joinedload(Employee.discipline),
-        ).where(Employee.is_active == True)
-
-        if discipline_id is not None:
-            stmt = stmt.where(Employee.discipline_id == discipline_id)
-
-        emps = db.execute(stmt).scalars().unique().all()
+        emps = db.execute(
+            sa_select(Employee)
+            .options(
+                joinedload(Employee.current_position).joinedload(Positions.location),
+                joinedload(Employee.transfer_requests),
+                joinedload(Employee.discipline),
+            )
+            .where(Employee.is_active == True)
+        ).scalars().unique().all()
 
         result = []
         for emp in emps:
@@ -77,14 +76,13 @@ class CycleEngineService:
         max_cycle_length: int = 5,
     ) -> List[dict]:
         """
-        Builds a directed employee graph for an entire discipline, extracts all 
-        valid closed loops, and uses a Greedy algorithm to return a list of 
-        non-overlapping cycles prioritized by the highest NLP match scores.
+        Builds a directed employee graph for an entire discipline, extracts all
+        valid closed loops, and returns non-overlapping cycles prioritized by
+        the highest NLP match scores.
         """
         if exempt_employee_ids is None:
             exempt_employee_ids = []
 
-        # ── 1. Fetch candidate employees for the discipline ──────────────
         approved_status = transfer_status.APPROVED.name
 
         emp_stmt = (
@@ -103,7 +101,6 @@ class CycleEngineService:
         )
         employees = db.execute(emp_stmt).scalars().unique().all()
 
-        # Keep only those with an APPROVED transfer request
         candidates: List[Employee] = []
         emp_approved_req: Dict[int, TransferRequest] = {}
         for emp in employees:
@@ -120,7 +117,6 @@ class CycleEngineService:
 
         emp_map: Dict[int, Employee] = {e.id: e for e in candidates}
 
-        # ── 2. Load rotation policies (Level Gating) ─────────────────────
         global_gating = {"promotions_allowed": [], "lateral_only": []}
         global_policy = db.execute(
             select(RotationPolicy).where(
@@ -150,19 +146,27 @@ class CycleEngineService:
         def _get_policy(location_id: int) -> dict:
             return policies_by_location.get(location_id, global_gating)
 
-        # ── 3. High-Performance NLP Batching ─────────────────────────────
-        # Extract all texts upfront
-        emp_texts = [MatchingService._extract_employee_assignments_text(emp) for emp in candidates]
-        pos_texts = [MatchingService._extract_position_history_text(db, emp.current_position_id) for emp in candidates]
+        emp_texts = [
+            MatchingService._extract_employee_assignments_text(emp)
+            for emp in candidates
+        ]
+        pos_texts = [
+            MatchingService._extract_position_history_text(
+                db,
+                emp.current_position_id,
+            )
+            for emp in candidates
+        ]
 
         model = NLPModelManager().get_model()
-        
-        # Run encode ONCE for all employees and ONCE for all positions
         emp_embs = model.encode(emp_texts, convert_to_tensor=True)
         pos_embs = model.encode(pos_texts, convert_to_tensor=True)
 
         emp_emb_map = {emp.id: emp_embs[i] for i, emp in enumerate(candidates)}
-        pos_emb_map = {emp.current_position_id: pos_embs[i] for i, emp in enumerate(candidates)}
+        pos_emb_map = {
+            emp.current_position_id: pos_embs[i]
+            for i, emp in enumerate(candidates)
+        }
 
         def _edge_score(from_emp_id: int, to_emp_id: int) -> float:
             target_pos_id = emp_map[to_emp_id].current_position_id
@@ -172,7 +176,6 @@ class CycleEngineService:
                 return 0.0
             return float(util.cos_sim(e_emb, p_emb).item())
 
-        # ── 4. Build Adjacency List ──────────────────────────────────────
         graph: Dict[int, List[int]] = {eid: [] for eid in emp_map}
 
         for emp_i in candidates:
@@ -187,11 +190,9 @@ class CycleEngineService:
 
                 target_pos = emp_j.current_position
 
-                # Location preference match
                 if target_pos.location_id not in prefs_i:
                     continue
 
-                # Level gating
                 policy = _get_policy(target_pos.location_id)
                 promos = policy["promotions_allowed"]
                 if target_pos.level in promos:
@@ -203,7 +204,6 @@ class CycleEngineService:
 
                 graph[emp_i.id].append(emp_j.id)
 
-        # ── 5. Find all Simple Cycles (DFS) ──────────────────────────────
         all_cycles: List[List[int]] = []
         nodes = sorted(graph.keys())
 
@@ -218,7 +218,6 @@ class CycleEngineService:
                     # Found a closed loop
                     if neighbour == start and len(path) >= 2:
                         if len(path) <= max_cycle_length:
-                            # Normalize: rotate so smallest id is first to prevent dupes
                             min_idx = path.index(min(path))
                             normalized = path[min_idx:] + path[:min_idx]
                             if normalized not in all_cycles:
@@ -229,7 +228,6 @@ class CycleEngineService:
                         continue
 
                     if neighbour <= start:
-                        # Optimization: only extend to nodes > start to avoid redundant paths
                         continue
 
                     if len(path) < max_cycle_length:
@@ -240,7 +238,6 @@ class CycleEngineService:
         if not all_cycles:
             return []
 
-        # ── 6. Score all cycles ──────────────────────────────────────────
         scored_cycles = []
         for cycle in all_cycles:
             edge_scores = []
@@ -249,18 +246,17 @@ class CycleEngineService:
                 to_id = cycle[(i + 1) % len(cycle)]
                 edge_scores.append(_edge_score(from_id, to_id))
 
-            overall_score = sum(edge_scores) / len(edge_scores) if edge_scores else 0.0
+            overall_score = (
+                sum(edge_scores) / len(edge_scores)
+                if edge_scores else 0.0
+            )
             scored_cycles.append((overall_score, cycle, edge_scores))
 
-        # Sort strictly descending by overall NLP match score
         scored_cycles.sort(key=lambda x: x[0], reverse=True)
 
-        # ── 7. Greedy Extraction ─────────────────────────────────────────
-        # Extract the best cycles without overlapping employees
         final_cycles_output = []
         used_employees: Set[int] = set()
 
-        # Pre-fetch all location names for the response formatting
         loc_ids = {emp.current_position.location_id for emp in candidates}
         locations = {
             loc.id: loc.city for loc in db.execute(
@@ -269,28 +265,31 @@ class CycleEngineService:
         }
 
         for score, cycle_ids, edge_scores in scored_cycles:
-            # If any employee in this cycle is already claimed by a better cycle, skip it
             if any(eid in used_employees for eid in cycle_ids):
                 continue
 
-            # Mark these employees as used
             used_employees.update(cycle_ids)
 
-            # Format the output steps for this cycle
             steps = []
             for i, eid in enumerate(cycle_ids):
                 emp_i = emp_map[eid]
                 next_eid = cycle_ids[(i + 1) % len(cycle_ids)]
                 emp_j = emp_map[next_eid]
-                
+
                 steps.append({
                     "from_employee_id": emp_i.id,
                     "from_employee_name": emp_i.name,
                     "from_position_id": emp_i.current_position_id,
-                    "from_location": locations.get(emp_i.current_position.location_id, "Unknown"),
+                    "from_location": locations.get(
+                        emp_i.current_position.location_id,
+                        "Unknown",
+                    ),
                     "to_position_id": emp_j.current_position_id,
-                    "to_location": locations.get(emp_j.current_position.location_id, "Unknown"),
-                    "match_score": round(edge_scores[i], 4)
+                    "to_location": locations.get(
+                        emp_j.current_position.location_id,
+                        "Unknown",
+                    ),
+                    "match_score": round(edge_scores[i], 4),
                 })
 
             final_cycles_output.append({

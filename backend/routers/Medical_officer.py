@@ -16,6 +16,8 @@ from schemas import (
     AppealDecisionPayload,
     DepartmentTransferResponse,
     ExemptionContextResponse,
+    MedicalApprovalPayload,
+    MedicalOfficerMedicalResponse,
 )
 
 router = APIRouter()
@@ -71,6 +73,22 @@ def _to_department_transfer_response(transfer: TransferRequest) -> dict:
     }
 
 
+def _to_medical_record_response(record: Medical) -> dict:
+    employee = record.employee
+    current_position = employee.current_position if employee else None
+    department = current_position.department if current_position else None
+
+    return {
+        "id": record.id,
+        "issue": record.issue,
+        "issue_year": record.issue_year,
+        "is_approve": record.is_approve,
+        "employee_id": employee.id if employee else record.employee_id,
+        "employee_name": employee.name if employee else "Unknown",
+        "current_department": department.name if department else "Unassigned",
+    }
+
+
 def _get_medical_appeal_transfer(db: Session, transfer_id: int) -> TransferRequest:
     transfer = db.query(TransferRequest).options(
         joinedload(TransferRequest.employee)
@@ -89,6 +107,46 @@ def _get_medical_appeal_transfer(db: Session, transfer_id: int) -> TransferReque
         )
 
     return transfer
+
+
+@router.get("/medical-records", response_model=list[MedicalOfficerMedicalResponse])
+def get_medical_records_for_review(
+    db: Session = Depends(get_session),
+    med_officer: Employee = Depends(get_current_med_officer),
+):
+    records = db.query(Medical).options(
+        joinedload(Medical.employee)
+        .joinedload(Employee.current_position)
+        .joinedload(Positions.department)
+    ).order_by(Medical.is_approve.asc(), Medical.id.desc()).all()
+
+    return [_to_medical_record_response(record) for record in records]
+
+
+@router.patch("/medical-records/{medical_id}/approval")
+def decide_medical_record_approval(
+    medical_id: int,
+    payload: MedicalApprovalPayload,
+    db: Session = Depends(get_session),
+    med_officer: Employee = Depends(get_current_med_officer),
+):
+    record = db.query(Medical).filter(Medical.id == medical_id).first()
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Medical record not found.",
+        )
+
+    record.is_approve = payload.is_approve
+    db.commit()
+
+    decision = "approved" if record.is_approve else "marked pending"
+    return {
+        "message": f"Medical record {decision}.",
+        "medical_id": record.id,
+        "is_approve": record.is_approve,
+    }
 
 
 @router.get("/transfers", response_model=list[DepartmentTransferResponse])
