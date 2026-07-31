@@ -7,7 +7,7 @@ Greedy Selection algorithm prioritized strictly by NLP match scores.
 """
 
 import uuid
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Optional, Set, Tuple
 from datetime import date
 
 from sqlalchemy.orm import Session, joinedload
@@ -35,7 +35,7 @@ class CycleEngineService:
         """
         approved_status = transfer_status.APPROVED.name
         emps = db.execute(
-            sa_select(Employee)
+            select(Employee)
             .options(
                 joinedload(Employee.current_position).joinedload(Positions.location),
                 joinedload(Employee.transfer_requests),
