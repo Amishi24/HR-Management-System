@@ -1,76 +1,164 @@
-import { useState, useEffect } from 'react'
-import { supabase } from './utils/supabaseClient' // Ensure this path matches your folder structure
-import './App.css'
+import { Routes, Route, Navigate } from "react-router-dom";
+
+import LoginPage from "./pages/LoginPage";
+import EmployeeLayout from "./layouts/EmployeeLayout";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
+import EmployeeProfilePage from "./pages/EmployeeProfilePage";
+import TransferRequestsPage from "./pages/TransferRequestsPage";
+import ProtectedRoute from "./components/ProtectedRoute";
+import ManagerDashboardPage from "./pages/ManagerDashboardPage";
+import TransferHeadDashboardPage from "./pages/TransferHeadDashboardPage";
+import TransferHeadInitiateTransfer from "./components/transfer-head/TransferHeadInitiateTransfer";
+import TransferHeadAppealsDashboard from "./components/transfer-head/TransferHeadAppealsDashboard";
+import TransferHeadVoluntaryRequestsPage from "./pages/TransferHeadVoluntaryRequestsPage";
 
 function App() {
-  // 1. State for our database data, loading status, and any potential errors
-  const [locations, setLocations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [errorMsg, setErrorMsg] = useState(null)
-
-  // 2. Fetch data from Supabase when the app loads
-  useEffect(() => {
-    async function fetchLocations() {
-      try {
-        const { data, error } = await supabase
-          .from('location')
-          .select('*')
-
-        if (error) throw error
-
-        console.log("Success! Data received:", data)
-        setLocations(data || [])
-      } catch (error) {
-        console.error("Error fetching data:", error.message)
-        setErrorMsg(error.message)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchLocations()
-  }, [])
-
-  // 3. Render the Dashboard UI
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', textAlign: 'left' }}>
-      <h1>HR Manpower Dashboard</h1>
-      <p style={{ color: '#888' }}>Live Database Connection Test</p>
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<LoginPage />} />
 
-      {/* Show Loading State */}
-      {loading && <p>Connecting to Supabase cloud...</p>}
+      <Route element={<ProtectedRoute />}>
+        <Route path="/employee" element={<EmployeeLayout />}>
+          <Route
+            index
+            element={<Navigate to="/employee/dashboard" replace />}
+          />
+          <Route path="dashboard" element={<EmployeeDashboard />} />
+          <Route path="profile" element={<EmployeeProfilePage />} />
+          <Route path="transfers" element={<TransferRequestsPage />} />
+        </Route>
+      </Route>
 
-      {/* Show Error State if the .env.local fails again */}
-      {errorMsg && (
-        <div style={{ color: '#ff4a4a', padding: '1rem', border: '1px solid #ff4a4a', borderRadius: '8px', marginTop: '1rem' }}>
-          <p><strong>Connection Error:</strong> {errorMsg}</p>
-          <p>Please double-check your .env.local file and restart the Vite server.</p>
-        </div>
-      )}
+      <Route
+        element={<ProtectedRoute allowedRoles={["DEPT_HEAD", "dept_head"]} />}
+      >
+        <Route path="/dept-head" element={<EmployeeLayout />}>
+          <Route
+            index
+            element={<Navigate to="/dept-head/personal" replace />}
+          />
+          <Route path="personal" element={<EmployeeDashboard />} />
+          <Route path="personal/profile" element={<EmployeeProfilePage />} />
+          <Route path="personal/transfers" element={<TransferRequestsPage />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/dept-head/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/team-management"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/transfer-management"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/employee-directory"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="dashboard"
+            element={<Navigate to="/dept-head/personal" replace />}
+          />
+        </Route>
+      </Route>
 
-      {/* Show the Data if successful */}
-      {!loading && !errorMsg && (
-        <div style={{ background: '#242424', padding: '20px', borderRadius: '8px', marginTop: '20px' }}>
-          <h3 style={{ borderBottom: '1px solid #444', paddingBottom: '10px', marginTop: 0 }}>
-            Active Locations
-          </h3>
-          
-          {locations.length === 0 ? (
-            <p style={{ color: '#aaa' }}>Database connected, but no locations found. Tell Developer A to insert "Delhi HQ"!</p>
-          ) : (
-            <ul style={{ listStyleType: 'none', padding: 0 }}>
-              {locations.map((loc) => (
-                <li key={loc.id} style={{ margin: '10px 0', padding: '15px', background: '#1a1a1a', borderRadius: '6px', border: '1px solid #333' }}>
-                  <strong style={{ fontSize: '1.2rem', color: '#fff' }}>{loc.name}</strong> <br />
-                  <small style={{ color: '#666', fontFamily: 'monospace' }}>UUID: {loc.id}</small>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-  )
+      <Route
+        element={<ProtectedRoute allowedRoles={["LOC_HEAD", "loc_head"]} />}
+      >
+        <Route path="/loc-head" element={<EmployeeLayout />}>
+          <Route index element={<Navigate to="/loc-head/personal" replace />} />
+          <Route path="personal" element={<EmployeeDashboard />} />
+          <Route path="personal/profile" element={<EmployeeProfilePage />} />
+          <Route path="personal/transfers" element={<TransferRequestsPage />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/loc-head/manager/manage-location" replace />
+            }
+          />
+          <Route
+            path="manager/manage-location"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/manage-positions"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="manager/transfer-workflow"
+            element={<ManagerDashboardPage />}
+          />
+          <Route
+            path="dashboard"
+            element={<Navigate to="/loc-head/personal" replace />}
+          />
+        </Route>
+      </Route>
+
+      <Route
+        element={<ProtectedRoute allowedRoles={["TRANSFER_HEAD", "transfer_head"]} />}
+      >
+        <Route path="/transfer-head" element={<EmployeeLayout />}>
+          <Route index element={<Navigate to="/transfer-head/manager" replace />} />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/transfer-head/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<TransferHeadDashboardPage />}
+          />
+          <Route
+            path="manager/initiate-transfer"
+            element={<TransferHeadInitiateTransfer />}
+          />
+          <Route
+            path="manager/appeals"
+            element={<TransferHeadAppealsDashboard />}
+          />
+          <Route
+            path="manager/voluntary-requests"
+            element={<TransferHeadVoluntaryRequestsPage />}
+          />
+          <Route
+            path="dashboard"
+            element={<Navigate to="/transfer-head/manager/dashboard" replace />}
+          />
+        </Route>
+      </Route>
+
+      <Route
+        element={<ProtectedRoute allowedRoles={["MED_OFFICER", "med_officer"]} />}
+      >
+        <Route path="/med-officer" element={<EmployeeLayout />}>
+          <Route
+            index
+            element={<Navigate to="/med-officer/manager/dashboard" replace />}
+          />
+          <Route
+            path="manager"
+            element={
+              <Navigate to="/med-officer/manager/dashboard" replace />
+            }
+          />
+          <Route
+            path="manager/dashboard"
+            element={<ManagerDashboardPage />}
+          />
+        </Route>
+      </Route>
+    </Routes>
+  );
 }
 
-export default App
+export default App;

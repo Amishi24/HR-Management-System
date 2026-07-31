@@ -1,38 +1,33 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import select
 from sqlalchemy.orm import Session
-from database import get_db
 
-app = FastAPI(title="ONGC API Server")
+# Import our setup from the files we just created
+from database import get_session
+from routers import employee, login, Department_head, Location_head, Medical_officer, policy, Transfer_head
 
-# Allow your React frontend laptop to communicate with FastAPI
+# Initialize the FastAPI application
+app = FastAPI(title="ONGC HR Management System")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Change to your frontend URL in production
+    allow_origins=["http://localhost:5173"],             
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],              
+    allow_headers=["*"],              
 )
 
+app.include_router(employee.router, prefix="/me", tags=["employee[self]"])
+app.include_router(login.router, prefix="/auth", tags=["Authentication"])
+app.include_router(Department_head.router, prefix="/dept-head", tags=["Department Head"])
+app.include_router(Location_head.router, prefix="/loc-head", tags=["Location Head"])
+app.include_router(Medical_officer.router, prefix="/med-officer", tags=["Medical Officer"])
+app.include_router(policy.router, prefix="/api", tags=["Policy"])
+app.include_router(Transfer_head.router, prefix="/transfer-head", tags=["Transfer Head"])
+
 @app.get("/")
-def read_root():
-    return {"message": "ONGC FastAPI Backend Server is Running!"}
+def health_check():
+    return {"status": "System Online", "database": "Connected"}
 
-@app.get("/test-db")
-def test_db(db: Session = Depends(get_db)):
-    try:
-        result = db.execute(text("SELECT NOW()")).fetchone()
 
-        return {
-            "message": "Database connected successfully!",
-            "time": str(result[0])
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Database connection failed: {str(e)}"
-        )
-    
-    

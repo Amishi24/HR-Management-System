@@ -1,0 +1,96 @@
+import api from "./axios";
+
+export const getDeptHeadDepartments = () => api.get("/dept-head/departments");
+export const getDeptHeadTeam = (departmentId) =>
+  api.get("/dept-head/team", {
+    params: departmentId ? { department_id: departmentId } : {},
+  });
+export const getDeptHeadTeamMember = (employeeId) =>
+  api.get(`/dept-head/team/${employeeId}`);
+export const getDeptHeadAlerts = () => api.get("/dept-head/transfers/alerts");
+export const getDeptHeadTransfers = (departmentId) =>
+  api.get("/dept-head/transfers", {
+    params: departmentId ? { department_id: departmentId } : {},
+  });
+export const reviewDeptHeadTransfer = (transferId, payload) =>
+  api.patch(`/dept-head/transfers/${transferId}/review`, payload);
+export const getDeptHeadAppealContext = (transferId) =>
+  api.get(`/dept-head/transfers/${transferId}/context`);
+export const decideDeptHeadAppeal = (transferId, payload) =>
+  api.patch(`/dept-head/transfers/${transferId}/appeal-decision`, payload);
+export const getDeptHeadCapacity = () =>
+  api.get("/dept-head/capacity-dashboard");
+export const createDeptHeadAssignment = (employeeId, tenureId, payload) =>
+  api.post(
+    `/dept-head/team/${employeeId}/tenures/${tenureId}/assignments`,
+    payload,
+  );
+export const deleteDeptHeadAssignment = (employeeId, assignmentId) =>
+  api.delete(`/dept-head/team/${employeeId}/assignments/${assignmentId}`);
+export const initiateDeptHeadTransfer = (payload) =>
+  api.post("/dept-head/transfers/initiate", payload);
+
+export const getLocHeadLocation = () => api.get("/loc-head/my-location");
+export const updateLocHeadLocationRequirements = (payload) =>
+  api.patch("/loc-head/my-location/requirements", payload);
+export const getLocHeadPositions = () =>
+  api.get("/loc-head/my-location/positions");
+export const createLocHeadPosition = (payload) =>
+  api.post("/loc-head/my-location/positions", payload);
+export const updateLocHeadPosition = (positionId, payload) =>
+  api.patch(`/loc-head/my-location/positions/${positionId}`, payload);
+export const deleteLocHeadPosition = (positionId) =>
+  api.delete(`/loc-head/my-location/positions/${positionId}`);
+export const getLocHeadDepartments = () => api.get("/loc-head/departments");
+export const getLocHeadDisciplines = () => api.get("/loc-head/disciplines");
+export const getLocHeadPolicy = () =>
+  api.get("/loc-head/my-location/rotation-policy");
+export const getGlobalPolicy = () => api.get("/loc-head/global-policy");
+export const createLocHeadPolicy = (payload) =>
+  api.post("/loc-head/my-location/rotation-policy", payload);
+export const updateLocHeadPolicy = (policyId, payload) =>
+  api.patch(`/loc-head/my-location/${policyId}`, payload);
+export const deleteLocHeadPolicy = (policyId) =>
+  api.delete(`/loc-head/my-location/${policyId}`);
+export const getLocHeadTeam = () => api.get("/loc-head/team");
+export const getLocHeadTeamMember = (employeeId) =>
+  api.get(`/loc-head/team/${employeeId}`);
+export const getLocHeadAlerts = () => api.get("/loc-head/transfers/alerts");
+export const initiateLocHeadTransfer = (payload) =>
+  api.post("/loc-head/transfers/initiate", payload);
+export const getLocHeadTransfers = () => api.get("/loc-head/transfers");
+export const reviewLocHeadTransfer = (transferId, payload) =>
+  api.patch(`/loc-head/transfers/${transferId}/review`, payload);
+export const getLocHeadAppealContext = (transferId) =>
+  api.get(`/loc-head/transfers/${transferId}/context`);
+export const decideLocHeadAppeal = (transferId, payload) =>
+  api.patch(`/loc-head/transfers/${transferId}/appeal-decision`, payload);
+
+export const getTransferHeadEligibleEmployees = () =>
+  api.get("/transfer-head/transfers/eligible");
+export const initiateTransferHeadTransfer = (payload) =>
+  api.post("/transfer-head/transfers/initiate", payload);
+export const getTransferHeadEducationalAppeals = () =>
+  api.get("/transfer-head/transfers/educational-appeals");
+export const getTransferHeadAppealContext = (transferId) =>
+  api.get(`/transfer-head/transfers/${transferId}/context`);
+export const decideTransferHeadAppeal = (transferId, payload) =>
+  api.patch(`/transfer-head/transfers/${transferId}/appeal-decision`, payload);
+export const revokeTransferHeadTransfer = (transferId) =>
+  api.delete(`/transfer-head/transfers/${transferId}`);
+export const getTransferHeadVoluntaryTransfers = () =>
+  api.get("/transfer-head/transfers/voluntary");
+export const approveTransferHeadVoluntaryTransfer = (transferId) =>
+  api.patch(`/transfer-head/transfers/${transferId}/approve-voluntary`);
+export const getTransferHeadEmployeeDetails = (employeeId) =>
+  api.get(`/transfer-head/employees/${employeeId}`);
+
+export const getMedicalOfficerRecords = () =>
+  api.get("/med-officer/medical-records");
+export const decideMedicalOfficerRecord = (medicalId, payload) =>
+  api.patch(`/med-officer/medical-records/${medicalId}/approval`, payload);
+export const getMedicalOfficerAppeals = () => api.get("/med-officer/transfers");
+export const getMedicalOfficerAppealContext = (transferId) =>
+  api.get(`/med-officer/transfers/${transferId}/context`);
+export const decideMedicalOfficerAppeal = (transferId, payload) =>
+  api.patch(`/med-officer/transfers/${transferId}/appeal-decision`, payload);
